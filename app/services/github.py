@@ -28,7 +28,7 @@ def _headers() -> dict:
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    if settings.github_tokens:
+    if settings.github_token:
         headers["Authorization"]= f"Bearer {settings.github_token}"
     return headers
 
@@ -62,7 +62,7 @@ async def _paginate(client: httpx.AsyncClient, path: str, max_pages: int, **para
     for _ in range(max_pages):
         response= await _get(client, url, **query)
         items += response.json()
-        next_page= response.link.get("next")
+        next_page= response.links.get("next")
         if not next_page:
             break
         url, query= next_page["url"], {}
@@ -83,7 +83,7 @@ async def fetch_activity(owner: str, repo: str) -> dict:
     since_30= now - timedelta(days=30)
     base= f"/repos/{owner}/{repo}"
     
-    async with httpx.AsyncClient(base_url=API, headers=_headers(), timeout=15) as client:
+    async with httpx.AsyncClient(base_url=API, headers=_headers(), timeout=15, follow_redirects=True) as client:
         info, total_commits, open_prs, commits_90, closed_prs= await asyncio.gather(
             _get(client, base),
             _count(client, f"{base}/commits"),
