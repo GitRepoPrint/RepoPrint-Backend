@@ -1,4 +1,10 @@
+from datetime import datetime
 from pydantic import BaseModel
+
+class ContributorsWindow(BaseModel):
+    complete: bool
+    commits_read: int
+    since: datetime
 
 class ActivityMetrics(BaseModel):
     owner: str
@@ -6,6 +12,11 @@ class ActivityMetrics(BaseModel):
     default_branch: str
     total_commits: int
     active_contributors: int
-    avg_pr_merge_time: float | None
+    contributors_window: ContributorsWindow
+    bots_excluded: int
+    median_pr_merge_time: float | None
     open_issues: int
+    fetched_at: datetime
+    refresh_available_at: datetime
+    cached: bool
     raw_metrics: dict
