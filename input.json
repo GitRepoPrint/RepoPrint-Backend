@@ -1,0 +1,96 @@
+{
+  "repository": "deti-org/payment-service",
+  "commit_sha": "3f89c1",
+  "elements": [
+    {
+      "id": "ext_client",
+      "type": "external_entity",
+      "name": "Customer Client",
+      "trust_zone": "internet"
+    },
+    {
+      "id": "proc_auth",
+      "type": "process",
+      "name": "Auth Gateway",
+      "file_path": "auth/session.ts",
+      "trust_zone": "internal_backend"
+    },
+    {
+      "id": "proc_payment",
+      "type": "process",
+      "name": "Payment Engine",
+      "file_path": "payments/webhooks.ts",
+      "trust_zone": "internal_backend"
+    },
+    {
+      "id": "proc_telemetry",
+      "type": "process",
+      "name": "Telemetry Collector",
+      "file_path": "telemetry/tracker.go",
+      "trust_zone": "internal_backend"
+    },
+    {
+      "id": "ds_users",
+      "type": "data_store",
+      "name": "Users DB",
+      "file_path": "storage/users.db",
+      "data_classification": "sensitive_data",
+      "encrypted_at_rest": false,
+      "retention_period_days": null,
+      "trust_zone": "internal_backend"
+    },
+    {
+      "id": "ds_logs",
+      "type": "data_store",
+      "name": "Event Logs",
+      "data_classification": "telemetry_data",
+      "retention_period_days": 180,
+      "trust_zone": "internal_backend"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "tb_internal",
+      "name": "Internal Backend Trust Boundary",
+      "enclosed_elements": ["proc_auth", "proc_payment", "proc_telemetry", "ds_users", "ds_logs"]
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow_1",
+      "name": "User Login Request",
+      "source": "ext_client",
+      "target": "proc_auth",
+      "protocol": "HTTPS",
+      "is_encrypted": true,
+      "data_payload": ["username", "password", "ip_address"]
+    },
+    {
+      "id": "flow_2",
+      "name": "Store User Profile",
+      "source": "proc_auth",
+      "target": "ds_users",
+      "protocol": "SQL",
+      "is_encrypted": false,
+      "data_payload": ["user_id", "email", "full_name", "oauth_token"]
+    },
+    {
+      "id": "flow_3",
+      "name": "Export Telemetry Stream",
+      "source": "proc_payment",
+      "target": "proc_telemetry",
+      "protocol": "gRPC",
+      "is_encrypted": true,
+      "data_payload": ["transaction_id", "user_id", "ip_address", "timestamp"]
+    },
+    {
+      "id": "flow_4",
+      "name": "Append Activity Log",
+      "source": "proc_telemetry",
+      "target": "ds_logs",
+      "protocol": "File/Disk",
+      "is_encrypted": false,
+      "data_payload": ["user_id", "action_payload", "timestamp"]
+    }
+  ]
+}
