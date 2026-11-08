@@ -1,0 +1,7 @@
+https://github.com/clouditor/cloud-property-graph/tree/main/cloudpg/src/main/java/io/clouditor/graph/nodes/labels
+
+https://petsymposium.org/#
+
+https://linddun.org/go/
+
+https://github.com/OWASP/threat-dragon
