@@ -58,3 +58,11 @@ Fornecer os predicados booleanos exatos com que o algoritmo inspeciona o grafo D
 
 vem de la com menores alteracoes
 ------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+https://linddun.org/publications/
+
+ctr+f -tutorial
