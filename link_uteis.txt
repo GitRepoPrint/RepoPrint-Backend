@@ -4,4 +4,57 @@ https://petsymposium.org/#
 
 https://linddun.org/go/
 
-https://github.com/OWASP/threat-dragon
+
+----------------------------------------------------------------------------------------------------------------------
+
+https://github.com/OWASP/threat-dragon/blob/main/td.vue/src/i18n/en.json -> copiei este ficheiro
+Do ficheiro de configuração e internacionalização do OWASP Threat Dragon (en.json), foram retirados dois conjuntos de especificações essenciais para a conceção do motor determinístico LINDDUN:
+
+1. As 7 Categorias Oficiais LINDDUN (secção threats.model.linddun):
+- Linkability
+- Identifiability
+- Non-repudiation
+- Detectability
+- Disclosure of information
+- Unawareness
+- Non-compliance
+
+Motivo da extração:
+Garantir o alinhamento da taxonomia do motor com a metodologia formal LINDDUN e o padrão adotado pela OWASP, padronizando a classificação de cada vulnerabilidade detetada no relatório final.
+
+2. Atributos Canónicos de Elementos e Fluxos de DFD (secção properties):
+- isALog (identifica nós de recolha e agregação de eventos/telemetria)
+- isEncrypted (sinaliza o estado de cifra em repouso ou em trânsito)
+- storesCredentials (identifica nós que persistem credenciais, tokens OAuth ou segredos)
+- publicNetwork (indica fluxos que atravessam redes públicas ou fronteiras de confiança desprotegidas)
+
+Motivo da extração:
+Fornecer os predicados booleanos exatos com que o algoritmo inspeciona o grafo DFD gerado a partir do código, permitindo acionar regras determinísticas diretas (por exemplo: isALog == true sem anonimização aciona ameaças de Detectability e Linkability; isEncrypted == false em storesCredentials aciona ameaças de Disclosure of information).
+
+
+
+
+{
+  "categories": {
+    "linkability": "Linkability",
+    "identifiability": "Identifiability",
+    "non_repudiation": "Non-repudiation",
+    "detectability": "Detectability",
+    "disclosure_of_information": "Disclosure of information",
+    "unawareness": "Unawareness",
+    "non_compliance": "Non-compliance"
+  },
+
+  "dfd_properties": {
+    "handlesCardPayment": "Card payment",
+    "isALog": "Is a Log",
+    "isEncrypted": "Encrypted",
+    "isSigned": "Signed",
+    "isWebApplication": "Web Application",
+    "providesAuthentication": "Provides Authentication",
+    "publicNetwork": "Public Network",
+    "storesCredentials": "Stores Credentials"
+}
+
+vem de la com menores alteracoes
+------------------------------------------------------------------------------------------------------------------------
