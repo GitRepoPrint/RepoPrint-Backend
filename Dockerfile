@@ -15,7 +15,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY main.py ./
 COPY app ./app
 
-RUN useradd --system --no-create-home repoprint
+RUN useradd --system --create-home repoprint
 USER repoprint
 
 EXPOSE 8000
