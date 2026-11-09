@@ -118,7 +118,7 @@ def test_html_page_reports_forms_resources_handlers_and_inline_javascript():
     assert parsed.imports == ["./a.js"]
     assert parsed.calls == ["fetch"]
     assert parsed.urls == ["https://api.y.com/z"]
-    assert parsed.definitions == [{"kind": "function", "name": "go", "line": 6}]
+    assert [(d["kind"], d["name"], d["line"]) for d in parsed.definitions] == [("function", "go", 6)]
 
 
 def test_vue_single_file_component_uses_the_same_extraction():

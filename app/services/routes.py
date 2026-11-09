@@ -170,7 +170,8 @@ def annotation_routes(node: Node, language: str, seen: set) -> list[dict]:
     def add(methods: list[str], path: str | None, gated: bool):
         full= join_path(prefix, path if path is not None else sibling_path or "").replace("[action]", handler.lower())
         for method in methods or ["ANY"]:
-            routes.append({"method": method, "path": full, "handler": handler, "line": line, "gated": gated})
+            routes.append({"method": method, "path": full, "handler": handler, "line": line, "gated": gated,
+                           "span": (target.start_byte, target.end_byte)})
 
     for full_name, args in annotations:
         base= full_name.replace("::", ".").split(".")[-1]
@@ -205,6 +206,22 @@ def _args(node: Node) -> list[Node]:
     return [c.named_children[0] if c.type in ("argument", "value_argument") and c.named_child_count == 1 else c for c in args]
 
 
+HANDLER_NODES= {
+    "arrow_function", "function_expression", "function", "func_literal", "lambda", "lambda_expression",
+    "anonymous_function", "anonymous_function_creation_expression", "closure_expression", "lambda_literal",
+}
+BLOCK_NODES= {"do_block", "block", "lambda"}  # Sinatra/Rails: get "/x" do ... end
+
+
+def _handler_span(node: Node, args: list[Node]) -> tuple[int, int] | None:
+    """Corpo do handler quando é uma função anónima passada à chamada (Express, Gin, Laravel, Sinatra...)."""
+    for arg in reversed(args):
+        if arg.type in HANDLER_NODES:
+            return (arg.start_byte, arg.end_byte)
+    block= next((c for c in node.children if c.type in BLOCK_NODES), None)
+    return (block.start_byte, block.end_byte) if block is not None else None
+
+
 def _string_arg(arg: Node) -> str | None:
     if "string" not in arg.type:
         return None
@@ -234,8 +251,10 @@ def call_routes(node: Node, callee: str, language: str, path: str) -> list[dict]
     line= node.start_point[0] + 1
     lowered= name.lower()
 
+    span= _handler_span(node, args)
+
     def route(method: str, route_path: str, handler: str= "", gated: bool= True):
-        return {"method": method, "path": join_path(route_path), "handler": handler, "line": line, "gated": gated}
+        return {"method": method, "path": join_path(route_path), "handler": handler, "line": line, "gated": gated, "span": span}
 
     # app.get("/x", handler), r.GET("/x", h), Route::get("/x", ...)
     if (lowered in VERBS or lowered in ("all", "any")) and first is not None:

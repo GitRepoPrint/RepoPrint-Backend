@@ -21,6 +21,7 @@ def _analyse(archive, group_by: str) -> dict:
         "files_parsed": len(parsed),
         "files_with_syntax_errors": sum(p.has_errors for p in parsed),
         "routes": sum(len(p.routes) for p in parsed),
+        "flows": len(graph["flows"]),
         "languages": dict(Counter(p.language for p in parsed)),
         "unsupported_languages": failed,
     }

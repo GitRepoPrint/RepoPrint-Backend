@@ -33,6 +33,13 @@ DEFINITION_NODES= {
     "enum_declaration": "class", "record_declaration": "class", "singleton_method": "method",
     "fun_declaration": "function", "function_signature": "function", "subroutine": "function",
 }
+# Para o fluxo de dados: atribuições, parâmetros e campos com tipo, e imports com os nomes que trazem
+ASSIGNMENT_KINDS= {"assignment", "assignment_expression", "variable_declarator", "short_var_declaration", "let_declaration"}
+TYPED_KINDS= {"typed_parameter", "typed_default_parameter", "required_parameter", "optional_parameter", "formal_parameter", "parameter", "parameter_declaration"}
+FUNCTION_VALUES= {"arrow_function", "function_expression", "function", "generator_function"}
+VALUE_WRAPPERS= {"await", "await_expression", "parenthesized_expression", "non_null_expression", "as_expression", "type_assertion", "satisfies_expression"}
+TYPE_NOISE= {"Annotated", "Optional", "Union", "Final", "ClassVar", "Required", "Mono", "Flux", "Promise", "Readonly", "const", "final", "readonly", "var", "mut", "dyn", "impl", "static", "private", "public", "protected"}
+MAX_SITES= 20000
 URL_RE= re.compile(r"""https?://[^\s"'`<>\\)\]}]+""")
 MAX_STRING_BYTES= 2000
 MAX_CALL_TEXT= 120
@@ -82,6 +89,10 @@ class ParsedFile:
     html: HtmlInfo= field(default_factory=HtmlInfo)
     routes: list[dict]= field(default_factory=list)
     web_context: bool= False
+    call_sites: list[dict]= field(default_factory=list)
+    variables: list[dict]= field(default_factory=list)
+    bindings: list[tuple[str, str, str]]= field(default_factory=list)
+    url_sites: list[tuple[str, int]]= field(default_factory=list)
     has_errors: bool= False
 
 
@@ -162,6 +173,214 @@ class _State:
     language: str= ""
     routes: list[dict]= field(default_factory=list)
     route_targets: set= field(default_factory=set)
+    call_sites: list[dict]= field(default_factory=list)
+    variables: list[dict]= field(default_factory=list)
+    bindings: list[tuple[str, str, str]]= field(default_factory=list)
+    url_sites: list[tuple[str, int]]= field(default_factory=list)
+
+
+def _name_of(node: Node | None) -> str | None:
+    """Nome simples de uma variável: `self.repo`, `this.db` e `$db` ficam `repo`, `db` e `db`."""
+    if node is None:
+        return None
+    last= re.split(r"\.|->|::", _text(node).strip())[-1].lstrip("$@&*")
+    return last if re.fullmatch(r"\w+", last) else None
+
+
+def _type_root(text: str | None) -> str | None:
+    """Tipo base de uma anotação: `Optional[Session]`, `*sql.DB` e `List<User>` dão `Session`, `sql.DB` e `List`."""
+    for found in re.findall(r"[A-Za-z_][\w.]*", text or ""):
+        if found not in TYPE_NOISE:
+            return found
+    return None
+
+
+def _unwrap(node: Node | None) -> Node | None:
+    while node is not None and node.type in VALUE_WRAPPERS and node.named_child_count:
+        node= node.named_children[0]
+    return node
+
+
+ALIAS_VALUES= {"identifier", "attribute", "member_expression", "field_expression", "selector_expression", "member_access_expression", "variable_name"}
+
+
+def _init_callee(value: Node | None) -> str | None:
+    """Chamada que inicializa a variável, ou o nome de outra variável (`self.db = pool` copia o que `pool` é)."""
+    value= _unwrap(value)
+    if value is None:
+        return None
+    if value.type in CALL_NODES:
+        return _callee(value)
+    return _text(value).strip() if value.type in ALIAS_VALUES and len(_text(value)) < 80 else None
+
+
+def _variables(node: Node, language: str) -> list[tuple[str | None, str | None, str | None]]:
+    """(nome, tipo, chamada que o inicializa) das declarações e atribuições; só interessam as que têm tipo ou chamada."""
+    kind= node.type
+    field_of= node.child_by_field_name
+    found: list[tuple[Node | None, Node | None, Node | None]]= []
+    if kind == "typed_parameter":
+        found.append((next((c for c in node.children if c.type == "identifier"), None), field_of("type"), None))
+    elif kind in TYPED_KINDS:
+        found.append((field_of("name") or field_of("pattern"), field_of("type"), None))
+    elif kind == "short_var_declaration":
+        left, right= field_of("left"), field_of("right")
+        if left is not None and right is not None and left.named_children and right.named_children:
+            found.append((left.named_children[0], None, right.named_children[0]))
+    elif kind == "variable_declarator":
+        name= field_of("name")
+        value= field_of("value") or next((c for c in node.children if c.is_named and name is not None and c.id != name.id and c.type != "type_annotation"), None)
+        parent= node.parent
+        typ= field_of("type") or (parent.child_by_field_name("type") if parent is not None else None)
+        found.append((name, typ, value))
+    elif kind in ("assignment", "assignment_expression"):
+        found.append((field_of("left"), field_of("type"), field_of("right")))
+    elif kind == "let_declaration":
+        found.append((field_of("pattern"), field_of("type"), field_of("value")))
+    result= []
+    for name, typ, value in found:
+        item= (_name_of(name), _type_root(_text(typ)) if typ is not None else None, _init_callee(value))
+        if item[0] and (item[1] or item[2]):
+            result.append(item)
+    return result
+
+
+def _function_value(node: Node) -> tuple[str, Node] | None:
+    """`const list = async (req, res) => {}` e `exports.list = function () {}` são funções com nome."""
+    if node.type == "variable_declarator":
+        name, value= node.child_by_field_name("name"), node.child_by_field_name("value")
+    elif node.type == "assignment_expression":
+        name, value= node.child_by_field_name("left"), node.child_by_field_name("right")
+    elif node.type in ("public_field_definition", "field_definition"):
+        name, value= node.child_by_field_name("name") or node.child_by_field_name("property"), node.child_by_field_name("value")
+    else:
+        return None
+    value= _unwrap(value)
+    simple= _name_of(name)
+    return (simple, value) if simple and value is not None and value.type in FUNCTION_VALUES else None
+
+
+def _enclosing_class(node: Node, language: str) -> str | None:
+    if language == "go" and node.type == "method_declaration":
+        receiver= node.child_by_field_name("receiver")
+        found= re.findall(r"\w+", _text(receiver)) if receiver is not None else []
+        return found[-1] if found else None
+    parent= node.parent
+    while parent is not None:
+        if parent.type in routes.CLASS_KINDS or parent.type == "impl_item":
+            name= parent.child_by_field_name("name") or parent.child_by_field_name("type")
+            return _type_root(_text(name)) if name is not None else None
+        parent= parent.parent
+    return None
+
+
+BASE_NOISE= {"extends", "implements", "where", "new", "class", "struct", "public", "private", "protected", "internal", "static", "abstract", "sealed", "final", "object", "interface"}
+
+
+def _bases(node: Node, language: str) -> list[str]:
+    """Classes e interfaces de que uma classe herda ou que implementa (para seguir a injeção de dependências)."""
+    text= _text(node)
+    if language == "python":
+        match= re.match(r"class\s+\w+\s*\(([^)]*)\)", text)
+        names= re.findall(r"[A-Za-z_][\w.]*", match.group(1)) if match else []
+    else:
+        header= re.split(r"\{|\n", text, maxsplit=1)[0]
+        match= re.search(r"\b(?:extends|implements)\b(.+)$|\s:\s*(.+)$", re.sub(r"<[^<>]*>", "", header))
+        names= re.findall(r"[A-Za-z_][\w.]*", (match.group(1) or match.group(2)) if match else "")
+    return [n.split(".")[-1] for n in names if n not in BASE_NOISE and not n.startswith("keyword")]
+
+
+def _bindings(text: str, kind: str, language: str) -> list[tuple[str, str, str]]:
+    """(nome local, módulo, nome original) que um import traz para o ficheiro."""
+    text= text.strip()
+    found: list[tuple[str, str, str]]= []
+
+    def named(items: str, module: str, joiner: str= " as "):
+        for item in items.split(","):
+            item= item.strip().removeprefix("type ").strip()
+            if not item or item == "*":
+                continue
+            original, _, alias= item.partition(joiner)
+            found.append((alias.strip() or original.strip().split(".")[-1], module, original.strip()))
+
+    if language == "python":
+        match= re.match(r"from\s+(\.*[\w.]*)\s+import\s+\(?(.*?)\)?\s*$", text, re.S)
+        if match:
+            named(match.group(2), match.group(1))
+        elif (match := re.match(r"import\s+(.+)", text, re.S)):
+            for part in match.group(1).split(","):
+                module, _, alias= part.strip().partition(" as ")
+                if module.strip():
+                    found.append((alias.strip() or module.strip().split(".")[0], module.strip(), ""))
+    elif language in ("javascript", "typescript", "tsx") and kind == "import_statement":
+        match= re.match(r"""import\s+(?:type\s+)?(.+?)\s+from\s+['"]([^'"]+)['"]""", text, re.S)
+        if match:
+            clause, module= match.groups()
+            if (ns := re.search(r"\*\s+as\s+(\w+)", clause)):
+                found.append((ns.group(1), module, ""))
+            if (default := re.match(r"(\w+)\s*(?:,|$)", clause)) and default.group(1) != "type":
+                found.append((default.group(1), module, ""))
+            if (items := re.search(r"\{([^}]*)\}", clause)):
+                named(items.group(1), module)
+    elif language in ("java", "kotlin", "scala", "groovy"):
+        match= re.match(r"import\s+(static\s+)?([\w.]+?)(\.\*)?(?:\s+as\s+(\w+))?\s*;?$", text)
+        if match and not match.group(3):
+            static, path, _, alias= match.groups()
+            module, _, last= path.rpartition(".")
+            if static:
+                found.append((alias or last, module, last))
+            else:
+                found.append((alias or last, path, ""))
+    elif language == "go" and kind == "import_spec":
+        match= re.match(r'(?:(\w+|\.|_)\s+)?"([^"]+)"', text)
+        if match:
+            alias, module= match.groups()
+            segments= [seg for seg in module.split("/") if not re.fullmatch(r"v\d+", seg)]
+            found.append((alias or segments[-1], module, ""))
+    elif language == "rust" and kind == "use_declaration":
+        match= re.match(r"(?:pub\s+)?use\s+(.+?)\s*;?\s*$", text, re.S)
+        if match:
+            path= match.group(1)
+            if "{" in path:
+                prefix, _, rest= path.partition("{")
+                named(rest.rstrip("}"), prefix.rstrip(":"))
+            elif "*" not in path:
+                module, _, last= path.rpartition("::")
+                original, _, alias= last.partition(" as ")
+                if module:
+                    found.append((alias.strip() or original.strip(), module, original.strip()))
+    elif language == "php" and kind == "namespace_use_declaration":
+        for match in re.finditer(r"([\w\\]+?)(?:\s+as\s+(\w+))?\s*[,;]", text.removeprefix("use").strip() + ";"):
+            path, alias= match.groups()
+            found.append((alias or path.split("\\")[-1], path, path.split("\\")[-1]))
+    elif language == "csharp" and kind == "using_directive":
+        match= re.match(r"using\s+(\w+)\s*=\s*([\w.]+)\s*;", text)
+        if match:
+            found.append((match.group(1), match.group(2), ""))
+    return found
+
+
+def _require_bindings(call: Node, module: str) -> list[tuple[str, str, str]]:
+    """`const x = require("m")` e `const { a, b: c } = require("m")`."""
+    parent= call.parent
+    if parent is not None and parent.type in VALUE_WRAPPERS:
+        parent= parent.parent
+    if parent is None or parent.type != "variable_declarator":
+        return []
+    name= parent.child_by_field_name("name")
+    if name is None:
+        return []
+    if name.type == "identifier":
+        return [(_text(name), module, "")]
+    found= []
+    for child in name.named_children:
+        if child.type == "shorthand_property_identifier_pattern":
+            found.append((_text(child), module, _text(child)))
+        elif child.type == "pair_pattern":
+            key, value= child.child_by_field_name("key"), child.child_by_field_name("value")
+            if key is not None and value is not None:
+                found.append((_text(value), module, _text(key)))
+    return found
 
 
 def _record_tag(info: HtmlInfo, tag: str, attrs: dict[str, str], jsx: bool= False):
@@ -234,14 +453,14 @@ def _script_language(attrs: dict[str, str]) -> str | None:
     return "typescript" if attrs.get("lang", "").lower() in ("ts", "typescript") else "javascript"
 
 
-def _inline_script(state: _State, attrs: dict[str, str], body: bytes, line_offset: int):
+def _inline_script(state: _State, attrs: dict[str, str], body: bytes, line_offset: int, byte_offset: int= 0):
     language= _script_language(attrs)
     if language is None:
         return
     state.html.inline_scripts += 1
     if body.strip():
         try:
-            _walk(_parser(language).parse(body).root_node, state, line_offset, language)
+            _walk(_parser(language).parse(body).root_node, state, line_offset, language, byte_offset)
         except Exception:
             pass
 
@@ -257,7 +476,7 @@ def _is_docstring(node: Node) -> bool:
     return node.type == "string" and parent.type in ("block", "module")
 
 
-def _walk(root: Node, state: _State, line_offset: int= 0, language: str | None= None):
+def _walk(root: Node, state: _State, line_offset: int= 0, language: str | None= None, byte_offset: int= 0):
     language= language or state.language
     detect_routes= not routes.is_test_path(state.path)
     stack= [root]
@@ -282,7 +501,7 @@ def _walk(root: Node, state: _State, line_offset: int= 0, language: str | None= 
             body= next((c for c in node.children if c.type == "raw_text"), None)
             attrs= _tag_attributes(start) if start is not None else {}
             if "src" not in attrs and body is not None:
-                _inline_script(state, attrs, body.text or b"", line_offset + body.start_point[0])
+                _inline_script(state, attrs, body.text or b"", line_offset + body.start_point[0], byte_offset + body.start_byte)
             elif "src" not in attrs:
                 state.html.inline_scripts += 1
         elif detect_routes and routes.is_annotation(node, language):
@@ -291,6 +510,7 @@ def _walk(root: Node, state: _State, line_offset: int= 0, language: str | None= 
             module= _module_of_import(node)
             if module:
                 state.imports[module]= None
+                state.bindings.extend(_bindings(_text(node), kind, language))
         elif kind in CALL_NODES:
             callee= _callee(node)
             if callee:
@@ -298,8 +518,13 @@ def _walk(root: Node, state: _State, line_offset: int= 0, language: str | None= 
                     module= _first_string_arg(node)
                     if module:
                         state.imports[module]= None
+                        if callee.split(".")[-1] == "require":
+                            state.bindings.extend(_require_bindings(node, module))
                 else:
                     state.calls[callee]= None
+                    if len(state.call_sites) < MAX_SITES:
+                        state.call_sites.append({"callee": callee, "start": byte_offset + node.start_byte, "line": line_offset + node.start_point[0] + 1,
+                                                 "arg": _first_string_arg(node)})
                     if detect_routes:
                         state.routes.extend(routes.call_routes(node, callee, language, state.path))
         elif kind in DEFINITION_NODES and DEFINITION_NODES[kind]:
@@ -309,11 +534,33 @@ def _walk(root: Node, state: _State, line_offset: int= 0, language: str | None= 
                     "kind": DEFINITION_NODES[kind],
                     "name": _text(name),
                     "line": line_offset + node.start_point[0] + 1,
+                    "start": byte_offset + node.start_byte,
+                    "end": byte_offset + node.end_byte,
+                    "class": _enclosing_class(node, language),
+                    **({"bases": _bases(node, language)} if DEFINITION_NODES[kind] == "class" else {}),
+                })
+
+        if kind in ASSIGNMENT_KINDS or kind in TYPED_KINDS or (kind == "field_declaration" and language == "go"):
+            if len(state.variables) < MAX_SITES:
+                if kind == "field_declaration":  # campos de structs em Go: `store *Store`
+                    name, typ= node.child_by_field_name("name"), node.child_by_field_name("type")
+                    found= [(_name_of(name), _type_root(_text(typ)) if typ is not None else None, None)] if name is not None else []
+                else:
+                    found= _variables(node, language)
+                state.variables.extend({"name": n, "type": t, "init": i, "start": byte_offset + node.start_byte} for n, t, i in found if n and (t or i))
+        if kind in ("variable_declarator", "assignment_expression", "public_field_definition", "field_definition"):
+            if (function := _function_value(node)) is not None:
+                name_text, value= function
+                state.definitions.append({
+                    "kind": "function", "name": name_text, "line": line_offset + value.start_point[0] + 1,
+                    "start": byte_offset + value.start_byte, "end": byte_offset + value.end_byte, "class": _enclosing_class(node, language),
                 })
 
         if "string" in kind and node.end_byte - node.start_byte <= MAX_STRING_BYTES:
             for url in URL_RE.findall(_text(node)):
                 state.urls[url.rstrip(".,;:")]= None
+                if len(state.url_sites) < MAX_SITES:
+                    state.url_sites.append((url.rstrip(".,;:"), byte_offset + node.start_byte))
 
 
 def _scan_template(source: bytes, state: _State):
@@ -345,4 +592,8 @@ def parse_file(path: str, language: str, source: bytes) -> ParsedFile:
     parsed.html= state.html
     parsed.routes= routes.finalise(state.routes, state.imports, language)
     parsed.web_context= routes.web_context(state.imports)
+    parsed.call_sites= state.call_sites
+    parsed.variables= state.variables
+    parsed.bindings= state.bindings
+    parsed.url_sites= state.url_sites
     return parsed
