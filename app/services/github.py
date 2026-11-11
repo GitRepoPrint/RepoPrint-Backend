@@ -1,5 +1,6 @@
 import asyncio
 import re
+import statistics
 from datetime import datetime, timedelta, timezone
 import httpx
 from app.config import settings
@@ -69,12 +70,25 @@ async def _paginate(client: httpx.AsyncClient, path: str, max_pages: int, **para
     return items
 
 
+async def _or_none(call):
+    try:
+        return await call
+    except GitHubError as e:
+        if e.status== 404:
+            return None
+        raise
+
+
 def _dt(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
 def _author(commit: dict) -> str:
     return (commit["author"] or {}).get("login") or commit["commit"]["author"]["email"]
+
+
+def _is_bot(commit: dict) -> bool:
+    return (commit["author"] or {}).get("type")== "Bot"
 
 
 async def fetch_activity(owner: str, repo: str) -> dict:
@@ -84,40 +98,67 @@ async def fetch_activity(owner: str, repo: str) -> dict:
     base= f"/repos/{owner}/{repo}"
     
     async with httpx.AsyncClient(base_url=API, headers=_headers(), timeout=15, follow_redirects=True) as client:
-        info, total_commits, open_prs, commits_90, closed_prs= await asyncio.gather(
+        info, total_commits, commits_30d, commits_90d, open_prs, commit_sample, closed_prs= await asyncio.gather(
             _get(client, base),
             _count(client, f"{base}/commits"),
-            _count(client, f"{base}/pulls", state="open"),
+            _count(client, f"{base}/commits", since=since_30.isoformat()),
+            _count(client, f"{base}/commits", since=since_90.isoformat()),
+            _or_none(_count(client, f"{base}/pulls", state="open")),
             _paginate(client, f"{base}/commits", MAX_COMMIT_PAGES, since=since_90.isoformat()),
-            _paginate(client, f"{base}/pulls", 1, state="closed", sort="updated", direction="desc"),
+            _or_none(_paginate(client, f"{base}/pulls", 1, state="closed", sort="updated", direction="desc")),
         )
-        
+
         info= info.json()
-        
-        commits_30= [c for c in commits_90 if _dt(c["commit"]["author"]["date"]) >= since_30]
+        open_prs= open_prs or 0
+        closed_prs= closed_prs or []
 
     merge_hours= [
         (_dt(p["merged_at"]) - _dt(p["created_at"])).total_seconds() / 3600
         for p in closed_prs
         if p["merged_at"]
         ]
-    
+
+    people= {_author(c) for c in commit_sample if not _is_bot(c)}
+    bots= {_author(c) for c in commit_sample if _is_bot(c)}
+    truncated= len(commit_sample) >= MAX_COMMIT_PAGES * 100
+    window_start= min(_dt(c["commit"]["committer"]["date"]) for c in commit_sample) if truncated else since_90
+
     return {
         "owner": owner,
         "repo": repo,
         "default_branch": info["default_branch"],
         "total_commits": total_commits,
-        "active_contributors": len({_author(c) for c in commits_90}),
-        "avg_pr_merge_time": round(sum(merge_hours) / len(merge_hours), 1) if merge_hours else None,
+        "active_contributors": len(people),
+        "contributors_window": {"complete": not truncated, "commits_read": len(commit_sample), "since": window_start},
+        "bots_excluded": len(bots),
+        "median_pr_merge_time": round(statistics.median(merge_hours), 1) if merge_hours else None,
         # open_issues_count do GitHub inclui PRs abertos
         "open_issues": max(info["open_issues_count"] - open_prs, 0),
         "raw_metrics": {
-            "commits_last_30d": len(commits_30),
-            "commits_last_90d": len(commits_90),
-            "commits_per_week_90d": round(len(commits_90) / (90 / 7), 1),
-            "commits_window_truncated": len(commits_90) >= MAX_COMMIT_PAGES * 100,
+            "commits_last_30d": commits_30d,
+            "commits_last_90d": commits_90d,
+            "commits_per_week_90d": round(commits_90d / (90 / 7), 1),
             "open_prs": open_prs,
             "merged_prs_sampled": len(merge_hours),
             "stars": info["stargazers_count"],
         },
     }
+
+
+_cache: dict[str, tuple[datetime, dict]]= {}
+
+
+async def get_activity(owner: str, repo: str) -> dict:
+    now= datetime.now(timezone.utc)
+    ttl= timedelta(seconds=settings.activity_cache_ttl_seconds)
+    for expired in [k for k, (stamp, _) in _cache.items() if now - stamp >= ttl]:
+        del _cache[expired]
+
+    key= f"{owner}/{repo}".lower()
+    if key in _cache:
+        stamp, data= _cache[key]
+        return {**data, "fetched_at": stamp, "refresh_available_at": stamp + ttl, "cached": True}
+
+    data= await fetch_activity(owner, repo)
+    _cache[key]= (now, data)
+    return {**data, "fetched_at": now, "refresh_available_at": now + ttl, "cached": False}

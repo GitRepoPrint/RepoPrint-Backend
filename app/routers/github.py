@@ -1,7 +1,7 @@
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from app.schemas.activity import ActivityMetrics
-from app.services.github import GitHubError, fetch_activity, parse_repo_url
+from app.services.github import GitHubError, get_activity as load_activity, parse_repo_url
 
 router= APIRouter(prefix="/github", tags=["github"])
 
@@ -10,7 +10,7 @@ router= APIRouter(prefix="/github", tags=["github"])
 async def get_activity(url: str= Query(..., description="URL do repositório GitHub")):
     try:
         owner, repo= parse_repo_url(url)
-        return await fetch_activity(owner, repo)
+        return await load_activity(owner, repo)
     except GitHubError as e:
         raise HTTPException(status_code=e.status, detail=e.message)
     except httpx.HTTPError:
