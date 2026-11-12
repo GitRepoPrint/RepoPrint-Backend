@@ -1,9 +1,63 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import httpx
 import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from app.config import settings
 from app.services import github
+
+ALEMBIC_INI= Path(__file__).resolve().parent.parent / "alembic.ini"
+
+
+def alembic_config() -> Config:
+    config= Config(str(ALEMBIC_INI))
+    config.set_main_option("script_location", str(ALEMBIC_INI.parent / "alembic"))
+    return config
+
+
+async def can_connect() -> bool:
+    engine= create_async_engine(settings.database_url)
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(select(1))
+        return True
+    except Exception:
+        return False
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def database():
+    if not settings.db_name.endswith("_test"):
+        pytest.skip("Os testes da BD apagam tudo: define DB_NAME com um nome terminado em _test.")
+    if not asyncio.run(can_connect()):
+        pytest.skip("Postgres indisponível: define DB_HOST, DB_PORT, DB_NAME, DB_USER e DB_PASSWORD.")
+    config= alembic_config()
+    command.downgrade(config, "base")
+    command.upgrade(config, "head")
+    yield config
+    command.downgrade(config, "base")
+
+
+@pytest.fixture
+async def session(database):
+    engine= create_async_engine(settings.database_url)
+    async with engine.connect() as connection:
+        transaction= await connection.begin()
+        db_session= AsyncSession(bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False)
+        try:
+            yield db_session
+        finally:
+            await db_session.close()
+            await transaction.rollback()
+    await engine.dispose()
 
 
 @pytest.fixture
