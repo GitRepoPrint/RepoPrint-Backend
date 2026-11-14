@@ -1,0 +1,497 @@
+{
+  "version": 1,
+  "comment": "Mapa de nomes de módulos importados para o tipo de elemento que representam num DFD. Fonte única partilhada: o backend (Python) e o overview (browser) leem este ficheiro. A ordem das entradas e dos módulos importa (a primeira correspondência ganha). Editar aqui e copiar para a outra metade; scripts/check-catalog-sync.sh compara as duas cópias.",
+  "entries": [
+    {
+      "category": "datastore",
+      "label": "PostgreSQL",
+      "technology": "postgresql",
+      "modules": [
+        "psycopg2",
+        "psycopg",
+        "asyncpg",
+        "pg",
+        "pg-promise",
+        "lib/pq",
+        "github.com/lib/pq",
+        "github.com/jackc/pgx",
+        "tokio_postgres",
+        "org.postgresql",
+        "npgsql"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "MySQL",
+      "technology": "mysql",
+      "modules": [
+        "mysql",
+        "mysql2",
+        "pymysql",
+        "mysqli",
+        "mysql.connector",
+        "github.com/go-sql-driver/mysql",
+        "mysql_async",
+        "com.mysql"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "SQLite",
+      "technology": "sqlite",
+      "modules": [
+        "sqlite3",
+        "better-sqlite3",
+        "rusqlite",
+        "mattn/go-sqlite3",
+        "sqlite"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "MongoDB",
+      "technology": "mongodb",
+      "modules": [
+        "flask_pymongo",
+        "mongoengine",
+        "pymongo",
+        "motor",
+        "mongoose",
+        "mongodb",
+        "go.mongodb.org/mongo-driver",
+        "mongo",
+        "org.mongodb"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "Redis",
+      "technology": "redis",
+      "modules": [
+        "redis",
+        "ioredis",
+        "aioredis",
+        "github.com/redis/go-redis",
+        "github.com/go-redis/redis",
+        "redis-py",
+        "jedis",
+        "org.redisson",
+        "stackexchange.redis"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "SQL database",
+      "technology": "sql-database",
+      "modules": [
+        "flask_sqlalchemy",
+        "sqlalchemy",
+        "django.db",
+        "peewee",
+        "tortoise",
+        "sqlmodel",
+        "databases",
+        "prisma",
+        "@prisma/client",
+        "typeorm",
+        "sequelize",
+        "knex",
+        "drizzle-orm",
+        "java.sql",
+        "javax.sql",
+        "javax.persistence",
+        "jakarta.persistence",
+        "org.hibernate",
+        "org.springframework.data",
+        "org.springframework.jdbc",
+        "database/sql",
+        "gorm.io/gorm",
+        "github.com/jmoiron/sqlx",
+        "diesel",
+        "sqlx",
+        "sea_orm",
+        "activerecord",
+        "active_record",
+        "sequel",
+        "pdo",
+        "doctrine",
+        "illuminate.database",
+        "microsoft.entityframeworkcore",
+        "system.data",
+        "dapper",
+        "slick",
+        "exposed"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "Elasticsearch",
+      "technology": "elasticsearch",
+      "modules": [
+        "elasticsearch",
+        "@elastic/elasticsearch",
+        "org.elasticsearch",
+        "opensearch",
+        "opensearchpy"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "Cassandra",
+      "technology": "cassandra",
+      "modules": [
+        "cassandra",
+        "gocql",
+        "com.datastax"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "Firebase",
+      "technology": "firebase",
+      "modules": [
+        "firebase",
+        "firebase_admin",
+        "firebase-admin",
+        "@firebase",
+        "cloud.google.com/go/firestore",
+        "com.google.firebase"
+      ]
+    },
+    {
+      "category": "datastore",
+      "label": "File storage",
+      "technology": "file-storage",
+      "modules": [
+        "fs",
+        "fs.promises",
+        "pathlib",
+        "shutil",
+        "java.nio.file",
+        "java.io",
+        "std::fs",
+        "os.readfile",
+        "io/ioutil"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "HTTP API",
+      "technology": "http-api",
+      "modules": [
+        "requests",
+        "httpx",
+        "aiohttp",
+        "urllib",
+        "urllib3",
+        "http.client",
+        "axios",
+        "node-fetch",
+        "got",
+        "superagent",
+        "undici",
+        "ky",
+        "net/http",
+        "reqwest",
+        "hyper",
+        "ureq",
+        "surf",
+        "okhttp3",
+        "okhttp",
+        "java.net.http",
+        "org.apache.http",
+        "org.apache.hc",
+        "retrofit2",
+        "org.springframework.web.client",
+        "org.springframework.web.reactive.function.client",
+        "system.net.http",
+        "net/http",
+        "faraday",
+        "httparty",
+        "rest-client",
+        "curl",
+        "guzzlehttp",
+        "symfony.component.httpclient",
+        "dio",
+        "package:http",
+        "alamofire",
+        "urlsession"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "AWS",
+      "technology": "aws",
+      "modules": [
+        "boto3",
+        "botocore",
+        "aws-sdk",
+        "@aws-sdk",
+        "software.amazon.awssdk",
+        "com.amazonaws",
+        "github.com/aws/aws-sdk-go",
+        "aws_sdk",
+        "aws-sdk-go-v2"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "Google Cloud",
+      "technology": "google-cloud",
+      "modules": [
+        "google.cloud",
+        "@google-cloud",
+        "cloud.google.com/go",
+        "com.google.cloud",
+        "googleapiclient",
+        "gcloud"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "Azure",
+      "technology": "azure",
+      "modules": [
+        "azure",
+        "@azure",
+        "com.azure",
+        "microsoft.azure",
+        "azure-sdk-for-go"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "Stripe",
+      "technology": "stripe",
+      "modules": [
+        "stripe",
+        "com.stripe",
+        "stripe-go",
+        "github.com/stripe"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "Twilio",
+      "technology": "twilio",
+      "modules": [
+        "twilio",
+        "com.twilio"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "SendGrid / SMTP",
+      "technology": "sendgrid-smtp",
+      "modules": [
+        "sendgrid",
+        "@sendgrid",
+        "smtplib",
+        "nodemailer",
+        "javax.mail",
+        "jakarta.mail",
+        "net/smtp",
+        "lettre",
+        "mail",
+        "actionmailer"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "OpenAI",
+      "technology": "openai",
+      "modules": [
+        "openai",
+        "github.com/sashabaranov/go-openai",
+        "async-openai"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "Anthropic",
+      "technology": "anthropic",
+      "modules": [
+        "anthropic",
+        "@anthropic-ai/sdk"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "Sentry",
+      "technology": "sentry",
+      "modules": [
+        "sentry_sdk",
+        "@sentry",
+        "io.sentry",
+        "sentry"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "Auth (OAuth / JWT)",
+      "technology": "auth-oauth-jwt",
+      "modules": [
+        "keycloak",
+        "keycloak-js",
+        "org.keycloak",
+        "authlib",
+        "oauthlib",
+        "passport",
+        "passport-oauth2",
+        "golang.org/x/oauth2",
+        "jsonwebtoken",
+        "jwt",
+        "pyjwt"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "WebSocket",
+      "technology": "websocket",
+      "modules": [
+        "websockets",
+        "websocket",
+        "ws",
+        "socket.io",
+        "socket.io-client",
+        "gorilla/websocket",
+        "github.com/gorilla/websocket",
+        "tungstenite",
+        "tokio_tungstenite"
+      ]
+    },
+    {
+      "category": "external",
+      "label": "gRPC",
+      "technology": "grpc",
+      "modules": [
+        "grpc",
+        "@grpc/grpc-js",
+        "io.grpc",
+        "google.golang.org/grpc",
+        "tonic"
+      ]
+    },
+    {
+      "category": "queue",
+      "label": "Kafka",
+      "technology": "kafka",
+      "modules": [
+        "kafka",
+        "kafkajs",
+        "confluent_kafka",
+        "kafka-python",
+        "org.apache.kafka",
+        "org.springframework.kafka",
+        "github.com/segmentio/kafka-go",
+        "github.com/shopify/sarama",
+        "rdkafka"
+      ]
+    },
+    {
+      "category": "queue",
+      "label": "RabbitMQ",
+      "technology": "rabbitmq",
+      "modules": [
+        "pika",
+        "aio_pika",
+        "amqplib",
+        "amqp",
+        "com.rabbitmq",
+        "org.springframework.amqp",
+        "github.com/streadway/amqp",
+        "github.com/rabbitmq/amqp091-go",
+        "lapin",
+        "bunny"
+      ]
+    },
+    {
+      "category": "queue",
+      "label": "Message queue",
+      "technology": "message-queue",
+      "modules": [
+        "celery",
+        "rq",
+        "bullmq",
+        "bull",
+        "kue",
+        "nats",
+        "github.com/nats-io/nats.go",
+        "sidekiq",
+        "resque",
+        "javax.jms",
+        "jakarta.jms",
+        "paho.mqtt",
+        "mqtt",
+        "azure.servicebus",
+        "pubsub"
+      ]
+    },
+    {
+      "category": "entrypoint",
+      "label": "Web API",
+      "technology": "web-api",
+      "modules": [
+        "litestar",
+        "koa-router",
+        "@koa/router",
+        "restify",
+        "polka",
+        "express-promise-router",
+        "flask",
+        "fastapi",
+        "django.http",
+        "django.views",
+        "django.urls",
+        "rest_framework",
+        "starlette",
+        "tornado",
+        "aiohttp.web",
+        "bottle",
+        "falcon",
+        "sanic",
+        "express",
+        "koa",
+        "fastify",
+        "@nestjs",
+        "hapi",
+        "@hapi",
+        "next",
+        "next/server",
+        "hono",
+        "org.springframework.web",
+        "org.springframework.web.bind",
+        "javax.ws.rs",
+        "jakarta.ws.rs",
+        "io.micronaut",
+        "io.quarkus",
+        "io.javalin",
+        "play.mvc",
+        "github.com/gin-gonic/gin",
+        "github.com/labstack/echo",
+        "github.com/gofiber/fiber",
+        "github.com/gorilla/mux",
+        "github.com/go-chi/chi",
+        "actix_web",
+        "axum",
+        "rocket",
+        "warp",
+        "tide",
+        "rails",
+        "action_controller",
+        "sinatra",
+        "grape",
+        "illuminate.http",
+        "illuminate.routing",
+        "symfony.component.httpfoundation",
+        "slim",
+        "microsoft.aspnetcore",
+        "vapor",
+        "ktor",
+        "io.ktor",
+        "phoenix",
+        "plug"
+      ]
+    }
+  ]
+}

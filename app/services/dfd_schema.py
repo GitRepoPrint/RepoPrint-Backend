@@ -13,7 +13,7 @@ As linhas dos pontos de chamada continuam a ir em extra.flows[].resources[].site
 import re
 from datetime import datetime, timezone
 
-from app.services.dfd_catalog import DATASTORE, EXTERNAL, QUEUE
+from app.services.dfd_catalog import DATASTORE, EXTERNAL, QUEUE, TECHNOLOGY
 
 SCHEMA_VERSION= "1"
 CLIENT_ID= "external_entity:client"
@@ -40,14 +40,15 @@ def _identity(node: dict) -> dict:
     if kind == EXTERNAL and "url" in data:
         # sítio encontrado num URL do código: não se sabe que tecnologia é
         return {"id": f"external_entity:{label.lower()}", "kind": "external_entity", "name": label, "tags": ["third-party"]}
+    technology= TECHNOLOGY.get((kind, label)) or slug(label)
     if kind == EXTERNAL:
-        return {"id": f"external_entity:{slug(label)}", "kind": "external_entity", "name": label,
-                "technology": slug(label), "tags": ["third-party"]}
+        return {"id": f"external_entity:{technology}", "kind": "external_entity", "name": label,
+                "technology": technology, "tags": ["third-party"]}
     if kind == DATASTORE:
-        return {"id": f"data_store:{slug(label)}", "kind": "data_store", "name": label, "technology": slug(label)}
+        return {"id": f"data_store:{technology}", "kind": "data_store", "name": label, "technology": technology}
     if kind == QUEUE:
-        return {"id": f"data_store:{slug(label)}", "kind": "data_store", "name": label,
-                "technology": slug(label), "tags": ["queue"]}
+        return {"id": f"data_store:{technology}", "kind": "data_store", "name": label,
+                "technology": technology, "tags": ["queue"]}
     raise ValueError(f"tipo de nó desconhecido: {kind!r}")
 
 

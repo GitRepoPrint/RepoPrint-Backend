@@ -74,6 +74,7 @@ def test_catalog_services_have_a_technology_and_hosts_found_in_urls_do_not(get_d
 def test_every_edge_endpoint_and_flow_step_is_a_node(get_dfd):
     body= get_dfd().json()
     ids= {n["id"] for n in body["nodes"]}
+    assert len(ids) == len(body["nodes"])
     assert all(e["source"] in ids and e["target"] in ids for e in body["edges"])
     assert len({e["id"] for e in body["edges"]}) == len(body["edges"])
     flows= body["extra"]["flows"]
