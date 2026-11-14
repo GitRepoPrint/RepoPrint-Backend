@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.schemas.dfd import DfdGraph
 from app.services.code_fetcher import download_archive, read_archive
 from app.services.dfd import build_dfd, parse_files
+from app.services.dfd_schema import to_schema
 from app.services.github import GitHubError, parse_repo_url
 
 router= APIRouter(prefix="/dfd", tags=["dfd"])
@@ -40,7 +41,7 @@ async def get_dfd(
             graph= await asyncio.to_thread(_analyse, archive, group_by)
         finally:
             archive.close()
-        return {"owner": owner, "repo": repo, "group_by": group_by, **graph}
+        return to_schema(graph, owner, repo, group_by)
     except GitHubError as e:
         raise HTTPException(status_code=e.status, detail=e.message)
     except httpx.HTTPError:

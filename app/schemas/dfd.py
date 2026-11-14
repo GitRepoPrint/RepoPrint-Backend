@@ -1,16 +1,37 @@
-from pydantic import BaseModel
+"""Modelos da resposta de GET /dfd. Seguem docs/dfd-schema.md (schema v1, nível "detail")."""
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+Kind= Literal["external_entity", "process", "data_store"]
+Source= Literal["config", "code", "manual"]
+Confidence= Literal["high", "medium", "low"]
 
 
-class Position(BaseModel):
-    x: float
-    y: float
+class Evidence(BaseModel):
+    file: str | None= None
+    line: int | None= None
+    span: int | None= None
+    note: str | None= None
+
+
+class Provenance(BaseModel):
+    source: Source
+    confidence: Confidence
+    evidence: list[Evidence]= Field(min_length=1)
 
 
 class DfdNode(BaseModel):
     id: str
-    type: str
-    data: dict
-    position: Position
+    kind: Kind
+    name: str
+    technology: str | None= None
+    tags: list[str]= Field(default_factory=list)
+    parent: str | None= None
+    path: str | None= None
+    provenance: Provenance
+    extra: dict= Field(default_factory=dict)
 
 
 class DfdEdge(BaseModel):
@@ -18,7 +39,10 @@ class DfdEdge(BaseModel):
     source: str
     target: str
     label: str
-    data: dict
+    operations: list[str]= Field(default_factory=list)
+    protocol: str | None= None
+    provenance: Provenance
+    extra: dict= Field(default_factory=dict)
 
 
 class DfdFlowResource(BaseModel):
@@ -50,11 +74,28 @@ class DfdStats(BaseModel):
     unsupported_languages: dict[str, str]
 
 
-class DfdGraph(BaseModel):
+class RepositoryRef(BaseModel):
     owner: str
     repo: str
-    group_by: str
+    ref: str | None= None
+
+
+class GraphMeta(BaseModel):
+    producer: Literal["browser-overview", "backend-detail"]
+    generated_at: datetime
+    group_by: str | None= None
+    stats: DfdStats | None= None
+
+
+class GraphExtra(BaseModel):
+    flows: list[DfdFlow]= Field(default_factory=list)
+
+
+class DfdGraph(BaseModel):
+    schema_version: Literal["1"]
+    repository: RepositoryRef
+    level: Literal["overview", "detail"]
     nodes: list[DfdNode]
     edges: list[DfdEdge]
-    flows: list[DfdFlow]
-    stats: DfdStats
+    meta: GraphMeta
+    extra: GraphExtra= Field(default_factory=GraphExtra)
