@@ -10,8 +10,15 @@ class Settings(BaseSettings):
     db_name: str= "repoprint"
     db_user: str= "repoprint"
     db_password: SecretStr | None= None
+    keycloak_issuer: str= "http://localhost:8080/realms/repoprint"
+    keycloak_jwks_url: str | None= None
+    keycloak_audience: str= "repoprint-api"
 
     model_config= SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def jwks_url(self) -> str:
+        return self.keycloak_jwks_url or f"{self.keycloak_issuer}/protocol/openid-connect/certs"
 
     @property
     def database_url(self) -> URL:

@@ -9,6 +9,7 @@ from app.db.base import Base, CreatedAtMixin, IdMixin, foreign_key
 class User(IdMixin, CreatedAtMixin, Base):
     __tablename__= "users"
 
+    keycloak_sub: Mapped[str | None]= mapped_column(String, unique=True)
     email: Mapped[str]= mapped_column(String, unique=True)
     name: Mapped[str | None]= mapped_column(String)
     role: Mapped[str | None]= mapped_column(String)

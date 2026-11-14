@@ -192,7 +192,7 @@ def test_parse_repo_url_rejects_other_urls(url):
     assert error.value.status== 400
 
 
-def test_endpoint_returns_the_new_fields(install):
+def test_endpoint_returns_the_new_fields(install, signed_in):
     install(FakeGitHub(sample=recent_sample(), closed=[pull(2), pull(4)]))
 
     response= TestClient(app).get("/github/activity", params={"url": "https://github.com/o/r"})
@@ -206,7 +206,7 @@ def test_endpoint_returns_the_new_fields(install):
     assert {"fetched_at", "refresh_available_at", "contributors_window"} <= body.keys()
 
 
-def test_endpoint_maps_an_empty_repository_to_422(install):
+def test_endpoint_maps_an_empty_repository_to_422(install, signed_in):
     install(FakeGitHub(empty=True))
 
     response= TestClient(app).get("/github/activity", params={"url": "https://github.com/o/r"})

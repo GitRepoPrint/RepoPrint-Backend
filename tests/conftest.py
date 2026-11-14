@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.config import settings
 from app.services import github
+from app.services.auth import current_claims
+from main import app
 
 ALEMBIC_INI= Path(__file__).resolve().parent.parent / "alembic.ini"
 
@@ -63,6 +65,13 @@ async def session(database):
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
+
+
+@pytest.fixture
+def signed_in():
+    app.dependency_overrides[current_claims]= lambda: {"sub": "user-1"}
+    yield
+    app.dependency_overrides.pop(current_claims, None)
 
 
 @pytest.fixture(autouse=True)
