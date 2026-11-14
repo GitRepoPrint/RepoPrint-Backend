@@ -180,11 +180,16 @@ def test_urls_in_docstrings_are_ignored_but_the_same_url_in_code_is_kept():
 @pytest.mark.parametrize("url", [
     "http://%s/x", "https://{host}/api", "http://${HOST}/api", "http://localhost:8000", "http://127.0.0.1/x",
     "https://example.com", "https://api.example.org/v1", "https://foobar.com", "https://svc.internal.test/x",
-    "http://foo.localhost.localdomain/x",
+    "http://foo.localhost.localdomain/x", "http://dev.local:5000", "https://foo.dev.local", "http://printer.local/status",
 ])
 def test_placeholder_hosts_never_become_external_entities(url):
     graph= build_dfd([parsed("a.py", f"x = '{url}'\n")])
     assert [n for n in graph["nodes"] if n["type"] == "external"] == []
+
+
+def test_a_host_that_merely_contains_local_is_still_a_real_host():
+    graph= build_dfd([parsed("a.py", "x = 'https://api.localytics.com/v1'\n")])
+    assert [n["id"] for n in graph["nodes"] if n["type"] == "external"] == ["external:api.localytics.com"]
 
 
 def test_documentation_links_in_strings_are_dropped_but_real_apis_are_kept():

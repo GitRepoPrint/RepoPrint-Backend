@@ -44,7 +44,7 @@ PLACEHOLDER_HOSTS= {
 }
 PLACEHOLDER_WORDS= ("tobereplaced", "replaceme", "changeme", "placeholder", "yourhost", "yourserver", "your-")
 EXAMPLE_DOMAINS= ("example.com", "example.org", "example.net")  # reservados pela RFC 2606, com subdomínios
-RESERVED_TLDS= (".example", ".test", ".invalid", ".localhost", ".localdomain")
+RESERVED_TLDS= (".example", ".test", ".invalid", ".localhost", ".localdomain", ".local")  # .local é mDNS: só existe na rede local
 # Sítios para onde o código só aponta em comentários, mensagens ou configuração de documentação
 REFERENCE_HOSTS= {
     "github.com", "gitlab.com", "bitbucket.org", "stackoverflow.com", "stackexchange.com", "pypi.org", "npmjs.com",
