@@ -12,6 +12,17 @@ def anyio_backend():
 
 
 @pytest.fixture(autouse=True)
+def fresh_dfd_guard():
+    """A aplicação dos testes é a mesma em todos: sem isto, o que um teste guardou na cache do /dfd aparecia no seguinte."""
+    import main
+    from app.config import settings
+    from app.services.guard import DfdGuard
+
+    main.app.state.guard= DfdGuard.from_settings(settings)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def clean_cache():
     github._cache.clear()
     yield
