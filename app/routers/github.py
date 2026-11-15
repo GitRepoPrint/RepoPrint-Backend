@@ -1,13 +1,16 @@
+from typing import Literal
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
 from app.models import User
 from app.schemas.activity import ActivityMetrics
-from app.services import audit, github_oauth
-from app.services.auth import get_current_user
+from app.services import audit, github_oauth, keycloak_admin
+from app.services.auth import current_claims, find_or_create_user, get_current_user
 from app.services.github import GitHubError, get_activity as load_activity, parse_repo_url
 from app.services.github_oauth import GitHubOAuthError
 
@@ -22,8 +25,28 @@ class CallbackIn(BaseModel):
     state: str
 
 
+class SigninFinishIn(BaseModel):
+    intent: Literal["login", "signup"]
+
+
 def oauth_error(error: GitHubOAuthError) -> HTTPException:
     return HTTPException(error.status, error.message)
+
+
+@router.post("/signin/finish")
+async def finish_signin(body: SigninFinishIn, claims: dict= Depends(current_claims), session: AsyncSession= Depends(get_session)):
+    user= await session.scalar(select(User).where(User.keycloak_sub== claims["sub"]))
+    created= user is None
+    if created and body.intent== "login":
+        try:
+            await keycloak_admin.delete_user(claims["sub"])
+        except keycloak_admin.KeycloakUnavailable:
+            raise HTTPException(503, "Serviço de autenticação indisponível")
+        raise HTTPException(404, "Não existe conta ligada a este GitHub")
+    if created:
+        user= await find_or_create_user(claims, session)
+    link= await github_oauth.connection(session, user.id)
+    return {"created": created, "connected": link is not None}
 
 
 @router.get("/connect")

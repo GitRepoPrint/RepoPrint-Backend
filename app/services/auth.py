@@ -82,6 +82,10 @@ async def sync_profile(session: AsyncSession, user: User, claims: dict) -> None:
 
 
 async def get_current_user(claims: dict= Depends(current_claims), session: AsyncSession= Depends(get_session)) -> User:
+    return await find_or_create_user(claims, session)
+
+
+async def find_or_create_user(claims: dict, session: AsyncSession) -> User:
     sub= claims["sub"]
     user= await session.scalar(select(User).where(User.keycloak_sub== sub))
     if user:
