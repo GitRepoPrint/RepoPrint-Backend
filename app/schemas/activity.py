@@ -26,6 +26,7 @@ class ContributorInfo(BaseModel):
     login: str | None
     commits: int
     last_commit_at: datetime
+    review_participation: float | None= None
 
 class CodeOwnersInfo(BaseModel):
     file: str | None
@@ -60,3 +61,4 @@ class ActivityMetrics(BaseModel):
     recent_prs: list[RecentPr]= []
     contributors: list[ContributorInfo]= []
     code_owners: CodeOwnersInfo | None= None
+    reviews_sampled: int= 0

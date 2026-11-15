@@ -136,7 +136,7 @@ def count_response(count):
 
 
 class FakeGitHub:
-    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False, canonical=None, branches=None, ci="success", license_="MIT", actions_forbidden=False, files=None, codeowners=None, codeowners_path=".github/CODEOWNERS", tree_truncated=False, tree_missing=False):
+    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False, canonical=None, branches=None, ci="success", license_="MIT", actions_forbidden=False, files=None, codeowners=None, codeowners_path=".github/CODEOWNERS", tree_truncated=False, tree_missing=False, reviews=None, graphql_status=200, graphql_errors=False):
         self.canonical= canonical
         self.branches= [{"name": "main", "protected": True}, {"name": "develop", "protected": False}] if branches is None else branches
         self.ci= ci
@@ -147,6 +147,9 @@ class FakeGitHub:
         self.codeowners_path= codeowners_path
         self.tree_truncated= tree_truncated
         self.tree_missing= tree_missing
+        self.reviews= reviews
+        self.graphql_status= graphql_status
+        self.graphql_errors= graphql_errors
         self.private= private
         self.unauthorized= unauthorized
         self.total= total
@@ -177,6 +180,8 @@ class FakeGitHub:
             return self._commits(params)
         if path.endswith("/pulls"):
             return self._pulls(params)
+        if path.endswith("/graphql"):
+            return self._graphql()
         if "/git/trees/" in path:
             return self._tree()
         if "/contents/" in path:
@@ -209,6 +214,17 @@ class FakeGitHub:
         if page * 100 < len(self.sample):
             headers["Link"]= f'<https://api.github.com/repos/o/r/commits?per_page=100&page={page + 1}>; rel="next"'
         return httpx.Response(200, json=chunk, headers=headers)
+
+    def _graphql(self):
+        if self.graphql_status != 200:
+            return httpx.Response(self.graphql_status)
+        if self.graphql_errors:
+            return httpx.Response(200, json={"errors": [{"message": "boom"}]})
+        nodes= [
+            {"author": {"login": pr["author"]} if pr["author"] else None, "reviews": {"nodes": [{"author": {"login": name}} for name in pr["reviewers"]]}}
+            for pr in (self.reviews or [])
+        ]
+        return httpx.Response(200, json={"data": {"repository": {"pullRequests": {"nodes": nodes}}}})
 
     def _tree(self):
         if self.tree_missing:

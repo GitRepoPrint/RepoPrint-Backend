@@ -42,6 +42,23 @@ def optional(call, default=None):
         return default
 
 
+def reference_reviews(repo):
+    owner, name= repo.split("/")
+    query= "query($o:String!,$n:String!){repository(owner:$o,name:$n){pullRequests(last:50,states:MERGED){nodes{author{login} reviews(first:30){nodes{author{login}}}}}}}"
+    out= subprocess.run(["gh", "api", "graphql", "-f", f"query={query}", "-F", f"o={owner}", "-F", f"n={name}"], capture_output=True, text=True)
+    if out.returncode:
+        return None
+    return json.loads(out.stdout)["data"]["repository"]["pullRequests"]["nodes"]
+
+
+def share(nodes, login):
+    others= [n for n in nodes if (n["author"] or {}).get("login") != login]
+    if not others:
+        return None
+    done= sum(1 for n in others if any((r["author"] or {}).get("login") == login for r in n["reviews"]["nodes"]))
+    return round(done * 100 / len(others), 1)
+
+
 def weekly(dates, now, since):
     counts= [0] * WEEKS
     for moment in dates:
@@ -95,6 +112,7 @@ def reference(repo, now, api):
         "default_protected": None if protected is None else default in protected,
         "ci_conclusion": run[0]["conclusion"] if run else None,
         "login_commits": per_login,
+        "review_nodes": reference_reviews(repo),
         "owners_file": owners_file,
         "tree_files": None if tree.get("truncated") else len(blobs),
         "owners_errors": None if errors is None else len(errors),
@@ -143,6 +161,8 @@ def rows(api, ref):
         ("codeowners_file", (api["code_owners"] or {}).get("file"), ref["owners_file"], api["code_owners"] is None or api["code_owners"]["file"]== ref["owners_file"]),
         ("codeowners_files_total", (api["code_owners"] or {}).get("files_total"), ref["tree_files"], api["code_owners"] is None or ref["tree_files"] is None or api["code_owners"]["files_total"]== ref["tree_files"]),
         ("codeowners_coverage_in_range", (api["code_owners"] or {}).get("coverage"), f"file errors={ref['owners_errors']}", api["code_owners"] is None or (0 <= api["code_owners"]["coverage"] <= 100 and (api["code_owners"]["file"] is not None or api["code_owners"]["coverage"]== 0))),
+        ("review_participation", {p["login"]: p["review_participation"] for p in api["contributors"] if p["login"]}, {p["login"]: share(ref["review_nodes"] or [], p["login"]) for p in api["contributors"] if p["login"]}, all(p["review_participation"]== share(ref["review_nodes"] or [], p["login"]) for p in api["contributors"] if p["login"])),
+        ("reviews_sampled", api["reviews_sampled"], len(ref["review_nodes"] or []), api["reviews_sampled"]== len(ref["review_nodes"] or [])),
         ("weekly_commits", api["weekly_commits"], ref["weekly_commits"], list_ok(api["weekly_commits"], ref["weekly_commits"])),
         ("recent_prs", [p["number"] for p in api["recent_prs"]], [p["number"] for p in ref["recent_prs"]], [(p["number"], p["hours"]) for p in api["recent_prs"]]== [(p["number"], p["hours"]) for p in ref["recent_prs"]]),
     ]

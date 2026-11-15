@@ -12,6 +12,17 @@ WEEKS= 12
 RECENT_PRS= 10
 MAX_CONTRIBUTORS= 10
 MAX_TREE_FILES= 60000
+REVIEW_PRS= 50
+REVIEWS_PER_PR= 30
+REVIEWS_QUERY= """
+query($owner: String!, $name: String!, $prs: Int!, $reviews: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(last: $prs, states: MERGED) {
+      nodes { author { login } reviews(first: $reviews) { nodes { author { login } } } }
+    }
+  }
+}
+"""
 CODEOWNERS_PATHS= (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS")
 WEEK_SECONDS= 7 * 24 * 3600
 CI_PASSING= {"success": True, "failure": False, "timed_out": False, "startup_failure": False}
@@ -153,6 +164,28 @@ async def _code_owners(client: httpx.AsyncClient, base: str, sha: str | None) ->
     return {"file": location, "coverage": round(owned / len(paths) * 100, 1) if paths else 0.0, "files_total": len(paths), "files_owned": owned}
 
 
+async def _merged_reviews(client: httpx.AsyncClient, owner: str, repo: str) -> list[dict] | None:
+    if "Authorization" not in client.headers:
+        return None
+    response= await client.post("/graphql", json={"query": REVIEWS_QUERY, "variables": {"owner": owner, "name": repo, "prs": REVIEW_PRS, "reviews": REVIEWS_PER_PR}})
+    if response.status_code== 401:
+        raise GitHubError(401, "Token do GitHub inválido")
+    if response.is_error:
+        return None
+    body= response.json()
+    if body.get("errors") or not body.get("data", {}).get("repository"):
+        return None
+    return body["data"]["repository"]["pullRequests"]["nodes"]
+
+
+def review_participation(prs: list[dict], login: str) -> float | None:
+    others= [p for p in prs if ((p.get("author") or {}).get("login")) != login]
+    if not others:
+        return None
+    reviewed= sum(1 for p in others if any(((r.get("author") or {}).get("login")) == login for r in p["reviews"]["nodes"]))
+    return round(reviewed / len(others) * 100, 1)
+
+
 async def _ci(client: httpx.AsyncClient, base: str, branch: str) -> dict | None:
     response= await _get(client, f"{base}/actions/runs", branch=branch, status="completed", per_page=1)
     runs= response.json().get("workflow_runs") or []
@@ -256,12 +289,17 @@ async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict
         open_prs= open_prs or 0
         closed_prs= closed_prs or []
         total_commits, head_sha= total_head
-        branches, ci, code_owners= await asyncio.gather(
+        branches, ci, code_owners, merged_reviews= await asyncio.gather(
             _optional(_branches(client, base, info["default_branch"])),
             _optional(_ci(client, base, info["default_branch"])),
             _optional(_code_owners(client, base, head_sha)),
+            _optional(_merged_reviews(client, owner, repo)),
         )
 
+
+    contributors= contributor_ranking(commit_sample)
+    for person in contributors:
+        person["review_participation"]= review_participation(merged_reviews, person["login"]) if merged_reviews and person["login"] else None
 
     merge_hours= [
         (_dt(p["merged_at"]) - _dt(p["created_at"])).total_seconds() / 3600
@@ -292,7 +330,8 @@ async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict
         "weekly_commits": weekly_commits(commit_sample, now, window_start),
         "punch_card": punch_card(commit_sample),
         "recent_prs": recent_prs(closed_prs),
-        "contributors": contributor_ranking(commit_sample),
+        "contributors": contributors,
+        "reviews_sampled": len(merged_reviews or []),
         "code_owners": code_owners,
         "raw_metrics": {
             "commits_last_30d": commits_30d,

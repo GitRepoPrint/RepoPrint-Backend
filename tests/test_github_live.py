@@ -41,6 +41,8 @@ async def test_real_repository_is_coherent(owner, repo, token):
     assert [p["commits"] for p in data["contributors"]]== sorted((p["commits"] for p in data["contributors"]), reverse=True)
     assert sum(p["commits"] for p in data["contributors"]) <= window["commits_read"]
     assert "@" not in str(data["contributors"])
+    assert all(p["review_participation"] is None or 0 <= p["review_participation"] <= 100 for p in data["contributors"])
+    assert 0 <= data["reviews_sampled"] <= 50
     if data["ci"]:
         assert data["ci"]["provider"]== "GitHub Actions"
 
