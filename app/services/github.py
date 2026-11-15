@@ -8,6 +8,7 @@ from app.config import settings
 MAX_COMMIT_PAGES= 5
 WEEKS= 12
 RECENT_PRS= 10
+MAX_CONTRIBUTORS= 10
 WEEK_SECONDS= 7 * 24 * 3600
 CI_PASSING= {"success": True, "failure": False, "timed_out": False, "startup_failure": False}
 
@@ -159,6 +160,19 @@ def punch_card(sample: list[dict]) -> list[list[int]] | None:
     return grid
 
 
+def contributor_ranking(sample: list[dict]) -> list[dict]:
+    people: dict[str, dict]= {}
+    for item in sample:
+        if _is_bot(item):
+            continue
+        moment= _committed(item)
+        entry= people.setdefault(_author(item), {"login": (item["author"] or {}).get("login"), "commits": 0, "last_commit_at": moment})
+        entry["commits"]+= 1
+        entry["last_commit_at"]= max(entry["last_commit_at"], moment)
+    ranked= sorted(people.values(), key=lambda p: (-p["commits"], -p["last_commit_at"].timestamp()))
+    return ranked[:MAX_CONTRIBUTORS]
+
+
 def recent_prs(closed: list[dict]) -> list[dict]:
     merged= sorted((p for p in closed if p["merged_at"]), key=lambda p: p["merged_at"])
     return [
@@ -246,6 +260,7 @@ async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict
         "weekly_commits": weekly_commits(commit_sample, now, window_start),
         "punch_card": punch_card(commit_sample),
         "recent_prs": recent_prs(closed_prs),
+        "contributors": contributor_ranking(commit_sample),
         "raw_metrics": {
             "commits_last_30d": commits_30d,
             "commits_last_90d": commits_90d,

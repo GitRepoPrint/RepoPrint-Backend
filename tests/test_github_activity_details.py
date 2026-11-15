@@ -180,3 +180,58 @@ async def test_activity_returns_the_new_blocks_end_to_end(install, signed_in):
     assert len(body["weekly_commits"])== WEEKS and sum(body["weekly_commits"])== 2
     assert sum(sum(day) for day in body["punch_card"])== 2
     assert [p["hours"] for p in body["recent_prs"]]== [2.0, 4.0]
+
+
+from app.services.github import MAX_CONTRIBUTORS, contributor_ranking
+
+
+def test_contributors_are_ranked_by_commits_with_the_last_commit():
+    sample= [commit("ana", at(1)), commit("bia", at(2)), commit("ana", at(3)), commit("bia", at(4)), commit("ana", at(9)), commit("caio", at(5))]
+
+    ranking= contributor_ranking(sample)
+
+    assert [(p["login"], p["commits"]) for p in ranking]== [("ana", 3), ("bia", 2), ("caio", 1)]
+    assert ranking[0]["last_commit_at"]== at(1)
+
+
+def test_contributors_exclude_bots():
+    sample= [commit("ana", at(1)), commit("dependabot[bot]", at(1), bot=True), commit("dependabot[bot]", at(2), bot=True)]
+
+    assert [p["login"] for p in contributor_ranking(sample)]== ["ana"]
+
+
+def test_equal_commit_counts_put_the_most_recent_first():
+    sample= [commit("ana", at(5)), commit("bia", at(1))]
+
+    assert [p["login"] for p in contributor_ranking(sample)]== ["bia", "ana"]
+
+
+def test_authors_without_a_github_account_have_no_login_and_never_leak_the_email():
+    sample= [commit(None, at(1), email="secret@example.com"), commit(None, at(2), email="secret@example.com"), commit(None, at(3), email="other@example.com")]
+
+    ranking= contributor_ranking(sample)
+
+    assert [(p["login"], p["commits"]) for p in ranking]== [(None, 2), (None, 1)]
+    assert "example.com" not in str(ranking)
+
+
+def test_only_the_top_contributors_are_kept():
+    sample= [commit(f"dev{i}", at(1)) for i in range(MAX_CONTRIBUTORS + 5)]
+
+    assert len(contributor_ranking(sample))== MAX_CONTRIBUTORS
+
+
+def test_no_commits_means_no_contributors():
+    assert contributor_ranking([])== []
+
+
+async def test_the_endpoint_returns_contributors_without_emails(install, signed_in):
+    sample= [commit("ana", datetime.now(timezone.utc) - timedelta(days=2), email="ana@secret.example"), commit(None, datetime.now(timezone.utc) - timedelta(days=3), email="ghost@secret.example")]
+    install(FakeGitHub(sample=sample))
+
+    response= TestClient(app).get("/github/activity", params={"url": "https://github.com/o/r"})
+
+    body= response.json()
+    assert [p["login"] for p in body["contributors"]]== ["ana", None]
+    assert all(p["commits"]== 1 and p["last_commit_at"] for p in body["contributors"])
+    assert "secret.example" not in response.text

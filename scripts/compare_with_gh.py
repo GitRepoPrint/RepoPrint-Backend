@@ -69,6 +69,10 @@ def reference(repo, now, api):
     run= (runs or {}).get("workflow_runs") or []
     sample= commits_90[: MAX_COMMIT_PAGES * 100]
     dates= [datetime.fromisoformat(c["d"]).astimezone(timezone.utc) for c in sample]
+    per_login= {}
+    for c in sample:
+        if c["t"]!= "Bot" and c["l"]:
+            per_login[c["l"]]= per_login.get(c["l"], 0) + 1
     window= api["contributors_window"]
     return {
         "total_commits": last_page(f"repos/{repo}/commits?per_page=1"),
@@ -85,6 +89,7 @@ def reference(repo, now, api):
         "protected": protected,
         "default_protected": None if protected is None else default in protected,
         "ci_conclusion": run[0]["conclusion"] if run else None,
+        "login_commits": per_login,
         "weekly_commits": weekly(dates, now, window["since"] if not window["complete"] else now - timedelta(days=90)),
         "recent_prs": [{"number": p["number"], "hours": round(h, 1)} for p, h in zip(merged[-10:], hours[-10:])],
     }
@@ -125,6 +130,8 @@ def rows(api, ref):
         ("protected_branches", len(branches.get("protected", [])), None if unknown else len(ref["protected"]), unknown or sorted(branches.get("protected", []))== sorted(ref["protected"][:100]) or close(len(branches.get("protected", [])), len(ref["protected"]))),
         ("default_protected", branches.get("default_protected"), ref["default_protected"], unknown or branches.get("default_protected")== ref["default_protected"]),
         ("ci_conclusion", ci.get("conclusion"), ref["ci_conclusion"], ci.get("conclusion")== ref["ci_conclusion"]),
+        ("top_contributors", [(p["login"], p["commits"]) for p in api["contributors"] if p["login"]][:3], [(p["login"], ref["login_commits"].get(p["login"])) for p in api["contributors"] if p["login"]][:3], all(ref["login_commits"].get(p["login"])== p["commits"] for p in api["contributors"] if p["login"])),
+        ("contributors_sorted", len(api["contributors"]), min(len(ref["login_commits"]), 10), [p["commits"] for p in api["contributors"]]== sorted((p["commits"] for p in api["contributors"]), reverse=True)),
         ("weekly_commits", api["weekly_commits"], ref["weekly_commits"], list_ok(api["weekly_commits"], ref["weekly_commits"])),
         ("recent_prs", [p["number"] for p in api["recent_prs"]], [p["number"] for p in ref["recent_prs"]], [(p["number"], p["hours"]) for p in api["recent_prs"]]== [(p["number"], p["hours"]) for p in ref["recent_prs"]]),
     ]

@@ -22,6 +22,11 @@ class CiInfo(BaseModel):
     passing: bool | None
     ran_at: datetime | None
 
+class ContributorInfo(BaseModel):
+    login: str | None
+    commits: int
+    last_commit_at: datetime
+
 class RecentPr(BaseModel):
     number: int
     hours: float
@@ -47,3 +52,4 @@ class ActivityMetrics(BaseModel):
     weekly_commits: list[int] | None= None
     punch_card: list[list[int]] | None= None
     recent_prs: list[RecentPr]= []
+    contributors: list[ContributorInfo]= []
