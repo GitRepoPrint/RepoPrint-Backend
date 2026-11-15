@@ -21,3 +21,4 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath= ["."]
 testpaths= ["tests"]
+markers= ["github_live: talks to the real GitHub, needs RUN_GITHUB_LIVE=1 and gh auth"]

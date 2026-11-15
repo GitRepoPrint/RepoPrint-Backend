@@ -6,6 +6,10 @@ import httpx
 from app.config import settings
 
 MAX_COMMIT_PAGES= 5
+WEEKS= 12
+RECENT_PRS= 10
+WEEK_SECONDS= 7 * 24 * 3600
+CI_PASSING= {"success": True, "failure": False, "timed_out": False, "startup_failure": False}
 
 REPO_RE= re.compile(r"^https?://(?:www\.)?github\.com/([^/\s]+)/([^/\s#?]+?)(?:\.git)?(?:/.*)?$")
 
@@ -58,6 +62,16 @@ async def _count(client: httpx.AsyncClient, path: str, **params) -> int:
     return len(response.json())
 
 
+async def _count_head(client: httpx.AsyncClient, path: str, **params) -> tuple[int, str | None]:
+    response= await _get(client, path, per_page=1, **params)
+    items= response.json()
+    head= items[0].get("sha") if items else None
+    last= response.links.get("last")
+    if last:
+        return int(re.search(r"[?&]page=(\d+)", last["url"]).group(1)), head
+    return len(items), head
+
+
 async def _paginate(client: httpx.AsyncClient, path: str, max_pages: int, **params) -> list[dict]:
     items: list[dict]= []
     url, query= path, {"per_page": 100, **params}
@@ -79,6 +93,79 @@ async def _or_none(call):
         if e.status== 404:
             return None
         raise
+
+
+async def _optional(call):
+    try:
+        return await call
+    except GitHubError as e:
+        if e.status in (404, 502):
+            return None
+        raise
+
+
+async def _branches(client: httpx.AsyncClient, base: str, default: str) -> dict:
+    response= await _get(client, f"{base}/branches", per_page=100)
+    items= response.json()
+    more= bool(response.links.get("next"))
+    total= await _count(client, f"{base}/branches") if more else len(items)
+    if more:
+        protected= [b["name"] for b in await _paginate(client, f"{base}/branches", 1, protected="true")]
+    else:
+        protected= [b["name"] for b in items if b.get("protected")]
+    return {
+        "names": [b["name"] for b in items],
+        "total": total,
+        "protected": protected,
+        "default_protected": default in protected,
+    }
+
+
+async def _ci(client: httpx.AsyncClient, base: str, branch: str) -> dict | None:
+    response= await _get(client, f"{base}/actions/runs", branch=branch, status="completed", per_page=1)
+    runs= response.json().get("workflow_runs") or []
+    if not runs:
+        return None
+    conclusion= runs[0].get("conclusion")
+    return {
+        "provider": "GitHub Actions",
+        "conclusion": conclusion,
+        "passing": CI_PASSING.get(conclusion),
+        "ran_at": runs[0].get("updated_at"),
+    }
+
+
+def _committed(commit: dict) -> datetime:
+    return _dt(commit["commit"]["committer"]["date"]).astimezone(timezone.utc)
+
+
+def weekly_commits(sample: list[dict], now: datetime, since: datetime) -> list[int]:
+    counts= [0] * WEEKS
+    for commit in sample:
+        week= int((now - _committed(commit)).total_seconds() // WEEK_SECONDS)
+        if 0 <= week < WEEKS:
+            counts[WEEKS - 1 - week]+= 1
+    complete= min(WEEKS, int((now - since).total_seconds() // WEEK_SECONDS))
+    return counts[WEEKS - complete:] if complete else []
+
+
+def punch_card(sample: list[dict]) -> list[list[int]] | None:
+    if not sample:
+        return None
+    grid= [[0] * 24 for _ in range(7)]
+    for commit in sample:
+        moment= _committed(commit)
+        grid[(moment.weekday() + 1) % 7][moment.hour]+= 1
+    return grid
+
+
+def recent_prs(closed: list[dict]) -> list[dict]:
+    merged= sorted((p for p in closed if p["merged_at"]), key=lambda p: p["merged_at"])
+    return [
+        {"number": p["number"], "hours": round((_dt(p["merged_at"]) - _dt(p["created_at"])).total_seconds() / 3600, 1)}
+        for p in merged[-RECENT_PRS:]
+        if "number" in p
+    ]
 
 
 def _dt(value: str) -> datetime:
@@ -108,9 +195,9 @@ async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict
     base= f"/repos/{owner}/{repo}"
 
     async with httpx.AsyncClient(base_url=settings.github_api_url, headers=_headers(token), timeout=15, follow_redirects=True) as client:
-        info, total_commits, commits_30d, commits_90d, open_prs, commit_sample, closed_prs= await asyncio.gather(
+        info, total_head, commits_30d, commits_90d, open_prs, commit_sample, closed_prs= await asyncio.gather(
             _get(client, base),
-            _count(client, f"{base}/commits"),
+            _count_head(client, f"{base}/commits"),
             _count(client, f"{base}/commits", since=since_30.isoformat()),
             _count(client, f"{base}/commits", since=since_90.isoformat()),
             _or_none(_count(client, f"{base}/pulls", state="open")),
@@ -123,6 +210,12 @@ async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict
             raise GitHubError(404, "Repositório não encontrado ou privado")
         open_prs= open_prs or 0
         closed_prs= closed_prs or []
+        branches, ci= await asyncio.gather(
+            _optional(_branches(client, base, info["default_branch"])),
+            _optional(_ci(client, base, info["default_branch"])),
+        )
+
+    total_commits, head_sha= total_head
 
     merge_hours= [
         (_dt(p["merged_at"]) - _dt(p["created_at"])).total_seconds() / 3600
@@ -146,6 +239,13 @@ async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict
         "median_pr_merge_time": round(statistics.median(merge_hours), 1) if merge_hours else None,
         # open_issues_count do GitHub inclui PRs abertos
         "open_issues": max(info["open_issues_count"] - open_prs, 0),
+        "commit_sha": head_sha,
+        "license": {"spdx_id": info["license"].get("spdx_id"), "name": info["license"].get("name")} if info.get("license") else None,
+        "branches": branches,
+        "ci": ci,
+        "weekly_commits": weekly_commits(commit_sample, now, window_start),
+        "punch_card": punch_card(commit_sample),
+        "recent_prs": recent_prs(closed_prs),
         "raw_metrics": {
             "commits_last_30d": commits_30d,
             "commits_last_90d": commits_90d,

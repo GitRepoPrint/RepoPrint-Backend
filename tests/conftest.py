@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -118,21 +119,28 @@ def commit(login, when, *, bot=False, email="anon@example.com"):
     }
 
 
-def pull(hours, *, merged=True):
-    created= datetime(2026, 10, 1, tzinfo=timezone.utc)
+PULL_NUMBERS= itertools.count(1)
+
+
+def pull(hours, *, merged=True, day=1):
+    created= datetime(2026, 10, day, tzinfo=timezone.utc)
     done= (created + timedelta(hours=hours)).isoformat()
-    return {"created_at": created.isoformat(), "merged_at": done if merged else None}
+    return {"number": next(PULL_NUMBERS), "created_at": created.isoformat(), "merged_at": done if merged else None}
 
 
 def count_response(count):
-    items= [{}] if count else []
+    items= [{"sha": "a3f89c1d" * 5}] if count else []
     headers= {"Link": f'<https://api.github.com/x?per_page=1&page={count}>; rel="last"'} if count > 1 else {}
     return httpx.Response(200, json=items, headers=headers)
 
 
 class FakeGitHub:
-    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False, canonical=None):
+    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False, canonical=None, branches=None, ci="success", license_="MIT", actions_forbidden=False):
         self.canonical= canonical
+        self.branches= [{"name": "main", "protected": True}, {"name": "develop", "protected": False}] if branches is None else branches
+        self.ci= ci
+        self.license_= license_
+        self.actions_forbidden= actions_forbidden
         self.private= private
         self.unauthorized= unauthorized
         self.total= total
@@ -163,7 +171,12 @@ class FakeGitHub:
             return self._commits(params)
         if path.endswith("/pulls"):
             return self._pulls(params)
+        if path.endswith("/branches"):
+            return self._branches(params)
+        if path.endswith("/actions/runs"):
+            return self._runs()
         return httpx.Response(200, json={
+            "license": {"spdx_id": self.license_, "name": f"{self.license_} License"} if self.license_ else None,
             "default_branch": "main",
             "open_issues_count": self.open_issues_count,
             "stargazers_count": 7,
@@ -186,6 +199,22 @@ class FakeGitHub:
         if page * 100 < len(self.sample):
             headers["Link"]= f'<https://api.github.com/repos/o/r/commits?per_page=100&page={page + 1}>; rel="next"'
         return httpx.Response(200, json=chunk, headers=headers)
+
+    def _branches(self, params):
+        items= [b for b in self.branches if b["protected"]] if params.get("protected")== "true" else self.branches
+        if params.get("per_page")== "1":
+            return count_response(len(items))
+        page= items[:100]
+        headers= {"Link": '<https://api.github.com/repos/o/r/branches?per_page=100&page=2>; rel="next"'} if len(items) > 100 else {}
+        return httpx.Response(200, json=page, headers=headers)
+
+    def _runs(self):
+        if self.actions_forbidden:
+            return httpx.Response(403)
+        if self.ci== "missing":
+            return httpx.Response(404)
+        runs= [{"conclusion": self.ci, "updated_at": "2026-10-20T10:00:00Z"}] if self.ci else []
+        return httpx.Response(200, json={"total_count": len(runs), "workflow_runs": runs})
 
     def _pulls(self, params):
         if not self.pulls:
