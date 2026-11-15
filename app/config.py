@@ -13,8 +13,18 @@ class Settings(BaseSettings):
     keycloak_issuer: str= "http://localhost:8080/realms/repoprint"
     keycloak_jwks_url: str | None= None
     keycloak_audience: str= "repoprint-api"
+    keycloak_url: str | None= None
+    keycloak_admin_client_secret: SecretStr | None= None
 
     model_config= SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def realm_url(self) -> str:
+        return self.keycloak_url or self.keycloak_issuer
+
+    @property
+    def admin_url(self) -> str:
+        return self.realm_url.replace("/realms/", "/admin/realms/")
 
     @property
     def jwks_url(self) -> str:
