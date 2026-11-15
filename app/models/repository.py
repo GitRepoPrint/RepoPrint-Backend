@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, String, false
+from sqlalchemy import Boolean, String, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IdMixin, foreign_key
@@ -8,6 +8,7 @@ from app.db.base import Base, CreatedAtMixin, IdMixin, foreign_key
 
 class Repository(IdMixin, CreatedAtMixin, Base):
     __tablename__= "repositories"
+    __table_args__= (UniqueConstraint("user_id", "url"),)
 
     user_id: Mapped[uuid.UUID | None]= foreign_key("users.id", nullable=True)
     team_id: Mapped[uuid.UUID | None]= foreign_key("teams.id", nullable=True)

@@ -93,6 +93,14 @@ def _is_bot(commit: dict) -> bool:
     return (commit["author"] or {}).get("type")== "Bot"
 
 
+async def fetch_repository(owner: str, repo: str, token: str | None= None) -> dict:
+    async with httpx.AsyncClient(base_url=settings.github_api_url, headers=_headers(token), timeout=15, follow_redirects=True) as client:
+        info= (await _get(client, f"/repos/{owner}/{repo}")).json()
+    if info.get("private") and not token:
+        raise GitHubError(404, "Repositório não encontrado ou privado")
+    return {"full_name": info["full_name"], "private": bool(info.get("private")), "default_branch": info.get("default_branch")}
+
+
 async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict:
     now= datetime.now(timezone.utc)
     since_90= now - timedelta(days=90)

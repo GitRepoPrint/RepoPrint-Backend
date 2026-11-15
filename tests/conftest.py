@@ -131,7 +131,8 @@ def count_response(count):
 
 
 class FakeGitHub:
-    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False):
+    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False, canonical=None):
+        self.canonical= canonical
         self.private= private
         self.unauthorized= unauthorized
         self.total= total
@@ -167,6 +168,7 @@ class FakeGitHub:
             "open_issues_count": self.open_issues_count,
             "stargazers_count": 7,
             "private": self.private,
+            "full_name": self.canonical or path.removeprefix("/repos/"),
         })
 
     def _commits(self, params):
