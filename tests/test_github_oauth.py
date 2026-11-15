@@ -6,7 +6,7 @@ import httpx
 import jwt
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import func, select
+from sqlalchemy import Text, func, literal, select
 
 from app.config import settings
 from app.models import AuditLog, User, UserOAuth
@@ -19,6 +19,8 @@ from test_auth import bearer, client, keycloak, make_token
 pytestmark= pytest.mark.anyio
 
 KEY= "k" * 32
+OPENPGP_AES_128= 7
+OPENPGP_AES_256= 9
 
 
 class FakeHub:
@@ -107,6 +109,25 @@ async def test_callback_stores_the_token_encrypted_and_reports_the_login(client,
     user= await session.scalar(select(User))
     assert await github_oauth.user_token(session, user.id)== "gho_ana"
     assert hub.oauth_calls[0]["redirect_uri"]== settings.github_redirect_uri
+
+
+async def test_the_token_is_encrypted_with_aes_256(client, session, hub):
+    await connect_as(client, hub, "code-ana")
+
+    packet= bytes((await stored(session))[0].access_token)
+
+    assert packet[2]== 4 and packet[3]== OPENPGP_AES_256
+
+
+async def test_a_token_stored_with_the_old_cipher_still_decrypts(client, session, hub):
+    await connect_as(client, hub, "code-ana")
+    row= (await stored(session))[0]
+    row.access_token= func.pgp_sym_encrypt(literal("gho_old", Text), literal(KEY, Text))
+    await session.flush()
+    await session.refresh(row)
+
+    assert bytes(row.access_token)[3]== OPENPGP_AES_128
+    assert await github_oauth.user_token(session, row.user_id)== "gho_old"
 
 
 async def test_the_token_is_never_returned_by_the_api(client, session, hub):

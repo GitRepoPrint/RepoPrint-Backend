@@ -13,6 +13,7 @@ from app.config import settings
 from app.models import User, UserOAuth
 from app.services import audit
 
+CIPHER_OPTIONS= "cipher-algo=aes256"
 PROVIDER= "github"
 SCOPE= "repo"
 STATE_SECONDS= 600
@@ -98,7 +99,7 @@ async def github_account(token: str) -> tuple[str, str]:
 
 
 def encrypt(value: str):
-    return func.pgp_sym_encrypt(literal(value, Text), literal(encryption_key(), Text))
+    return func.pgp_sym_encrypt(literal(value, Text), literal(encryption_key(), Text), literal(CIPHER_OPTIONS, Text))
 
 
 def decrypt(column):
