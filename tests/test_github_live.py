@@ -34,6 +34,9 @@ async def test_real_repository_is_coherent(owner, repo, token):
     assert sum(data["weekly_commits"]) <= window["commits_read"]
     assert len(data["recent_prs"]) <= 10
     assert all(p["hours"] >= 0 for p in data["recent_prs"])
+    owners= data["code_owners"]
+    assert owners is None or 0 <= owners["coverage"] <= 100
+    assert owners is None or owners["files_owned"] <= owners["files_total"]
     assert len(data["contributors"]) <= 10
     assert [p["commits"] for p in data["contributors"]]== sorted((p["commits"] for p in data["contributors"]), reverse=True)
     assert sum(p["commits"] for p in data["contributors"]) <= window["commits_read"]

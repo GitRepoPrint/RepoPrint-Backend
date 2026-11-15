@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import itertools
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -135,12 +136,17 @@ def count_response(count):
 
 
 class FakeGitHub:
-    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False, canonical=None, branches=None, ci="success", license_="MIT", actions_forbidden=False):
+    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False, canonical=None, branches=None, ci="success", license_="MIT", actions_forbidden=False, files=None, codeowners=None, codeowners_path=".github/CODEOWNERS", tree_truncated=False, tree_missing=False):
         self.canonical= canonical
         self.branches= [{"name": "main", "protected": True}, {"name": "develop", "protected": False}] if branches is None else branches
         self.ci= ci
         self.license_= license_
         self.actions_forbidden= actions_forbidden
+        self.files= ["README.md", "src/app.py"] if files is None else list(files)
+        self.codeowners= codeowners
+        self.codeowners_path= codeowners_path
+        self.tree_truncated= tree_truncated
+        self.tree_missing= tree_missing
         self.private= private
         self.unauthorized= unauthorized
         self.total= total
@@ -171,6 +177,10 @@ class FakeGitHub:
             return self._commits(params)
         if path.endswith("/pulls"):
             return self._pulls(params)
+        if "/git/trees/" in path:
+            return self._tree()
+        if "/contents/" in path:
+            return self._contents(path)
         if path.endswith("/branches"):
             return self._branches(params)
         if path.endswith("/actions/runs"):
@@ -199,6 +209,20 @@ class FakeGitHub:
         if page * 100 < len(self.sample):
             headers["Link"]= f'<https://api.github.com/repos/o/r/commits?per_page=100&page={page + 1}>; rel="next"'
         return httpx.Response(200, json=chunk, headers=headers)
+
+    def _tree(self):
+        if self.tree_missing:
+            return httpx.Response(404)
+        paths= list(self.files)
+        if self.codeowners is not None and self.codeowners_path not in paths:
+            paths.append(self.codeowners_path)
+        return httpx.Response(200, json={"truncated": self.tree_truncated, "tree": [{"path": p, "type": "blob"} for p in paths] + [{"path": "src", "type": "tree"}]})
+
+    def _contents(self, path):
+        if self.codeowners is None or not path.endswith("/" + self.codeowners_path):
+            return httpx.Response(404)
+        encoded= base64.b64encode(self.codeowners.encode()).decode()
+        return httpx.Response(200, json={"encoding": "base64", "content": encoded})
 
     def _branches(self, params):
         items= [b for b in self.branches if b["protected"]] if params.get("protected")== "true" else self.branches

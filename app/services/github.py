@@ -1,14 +1,18 @@
 import asyncio
+import base64
 import re
 import statistics
 from datetime import datetime, timedelta, timezone
 import httpx
 from app.config import settings
+from app.services.codeowners import count_owned, parse as parse_codeowners
 
 MAX_COMMIT_PAGES= 5
 WEEKS= 12
 RECENT_PRS= 10
 MAX_CONTRIBUTORS= 10
+MAX_TREE_FILES= 60000
+CODEOWNERS_PATHS= (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS")
 WEEK_SECONDS= 7 * 24 * 3600
 CI_PASSING= {"success": True, "failure": False, "timed_out": False, "startup_failure": False}
 
@@ -122,6 +126,33 @@ async def _branches(client: httpx.AsyncClient, base: str, default: str) -> dict:
     }
 
 
+async def _file_text(client: httpx.AsyncClient, base: str, path: str, ref: str) -> str | None:
+    data= (await _get(client, f"{base}/contents/{path}", ref=ref)).json()
+    if not isinstance(data, dict) or data.get("encoding")!= "base64":
+        return None
+    return base64.b64decode(data["content"]).decode("utf-8", errors="replace")
+
+
+async def _code_owners(client: httpx.AsyncClient, base: str, sha: str | None) -> dict | None:
+    if not sha:
+        return None
+    tree= (await _get(client, f"{base}/git/trees/{sha}", recursive=1)).json()
+    if tree.get("truncated"):
+        return None
+    paths= [entry["path"] for entry in tree.get("tree") or [] if entry.get("type")== "blob"]
+    if len(paths) > MAX_TREE_FILES:
+        return None
+    present= set(paths)
+    location= next((path for path in CODEOWNERS_PATHS if path in present), None)
+    if location is None:
+        return {"file": None, "coverage": 0.0, "files_total": len(paths), "files_owned": 0}
+    text= await _file_text(client, base, location, sha)
+    if text is None:
+        return None
+    owned= await asyncio.to_thread(count_owned, paths, parse_codeowners(text))
+    return {"file": location, "coverage": round(owned / len(paths) * 100, 1) if paths else 0.0, "files_total": len(paths), "files_owned": owned}
+
+
 async def _ci(client: httpx.AsyncClient, base: str, branch: str) -> dict | None:
     response= await _get(client, f"{base}/actions/runs", branch=branch, status="completed", per_page=1)
     runs= response.json().get("workflow_runs") or []
@@ -224,12 +255,13 @@ async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict
             raise GitHubError(404, "Repositório não encontrado ou privado")
         open_prs= open_prs or 0
         closed_prs= closed_prs or []
-        branches, ci= await asyncio.gather(
+        total_commits, head_sha= total_head
+        branches, ci, code_owners= await asyncio.gather(
             _optional(_branches(client, base, info["default_branch"])),
             _optional(_ci(client, base, info["default_branch"])),
+            _optional(_code_owners(client, base, head_sha)),
         )
 
-    total_commits, head_sha= total_head
 
     merge_hours= [
         (_dt(p["merged_at"]) - _dt(p["created_at"])).total_seconds() / 3600
@@ -261,6 +293,7 @@ async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict
         "punch_card": punch_card(commit_sample),
         "recent_prs": recent_prs(closed_prs),
         "contributors": contributor_ranking(commit_sample),
+        "code_owners": code_owners,
         "raw_metrics": {
             "commits_last_30d": commits_30d,
             "commits_last_90d": commits_90d,

@@ -74,6 +74,11 @@ def reference(repo, now, api):
         if c["t"]!= "Bot" and c["l"]:
             per_login[c["l"]]= per_login.get(c["l"], 0) + 1
     window= api["contributors_window"]
+    head= json.loads(gh(f"repos/{repo}/commits?per_page=1"))[0]["sha"]
+    tree= json.loads(gh(f"repos/{repo}/git/trees/{head}?recursive=1"))
+    blobs= [e["path"] for e in tree["tree"] if e["type"]== "blob"]
+    owners_file= next((p for p in (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS") if optional(lambda p=p: gh(f"repos/{repo}/contents/{p}?ref={head}"))), None)
+    errors= optional(lambda: json.loads(gh(f"repos/{repo}/codeowners/errors?ref={head}")).get("errors", []), None)
     return {
         "total_commits": last_page(f"repos/{repo}/commits?per_page=1"),
         "commits_30d": last_page(f"repos/{repo}/commits?since={since_30}&per_page=1"),
@@ -90,6 +95,9 @@ def reference(repo, now, api):
         "default_protected": None if protected is None else default in protected,
         "ci_conclusion": run[0]["conclusion"] if run else None,
         "login_commits": per_login,
+        "owners_file": owners_file,
+        "tree_files": None if tree.get("truncated") else len(blobs),
+        "owners_errors": None if errors is None else len(errors),
         "weekly_commits": weekly(dates, now, window["since"] if not window["complete"] else now - timedelta(days=90)),
         "recent_prs": [{"number": p["number"], "hours": round(h, 1)} for p, h in zip(merged[-10:], hours[-10:])],
     }
@@ -132,6 +140,9 @@ def rows(api, ref):
         ("ci_conclusion", ci.get("conclusion"), ref["ci_conclusion"], ci.get("conclusion")== ref["ci_conclusion"]),
         ("top_contributors", [(p["login"], p["commits"]) for p in api["contributors"] if p["login"]][:3], [(p["login"], ref["login_commits"].get(p["login"])) for p in api["contributors"] if p["login"]][:3], all(ref["login_commits"].get(p["login"])== p["commits"] for p in api["contributors"] if p["login"])),
         ("contributors_sorted", len(api["contributors"]), min(len(ref["login_commits"]), 10), [p["commits"] for p in api["contributors"]]== sorted((p["commits"] for p in api["contributors"]), reverse=True)),
+        ("codeowners_file", (api["code_owners"] or {}).get("file"), ref["owners_file"], api["code_owners"] is None or api["code_owners"]["file"]== ref["owners_file"]),
+        ("codeowners_files_total", (api["code_owners"] or {}).get("files_total"), ref["tree_files"], api["code_owners"] is None or ref["tree_files"] is None or api["code_owners"]["files_total"]== ref["tree_files"]),
+        ("codeowners_coverage_in_range", (api["code_owners"] or {}).get("coverage"), f"file errors={ref['owners_errors']}", api["code_owners"] is None or (0 <= api["code_owners"]["coverage"] <= 100 and (api["code_owners"]["file"] is not None or api["code_owners"]["coverage"]== 0))),
         ("weekly_commits", api["weekly_commits"], ref["weekly_commits"], list_ok(api["weekly_commits"], ref["weekly_commits"])),
         ("recent_prs", [p["number"] for p in api["recent_prs"]], [p["number"] for p in ref["recent_prs"]], [(p["number"], p["hours"]) for p in api["recent_prs"]]== [(p["number"], p["hours"]) for p in ref["recent_prs"]]),
     ]

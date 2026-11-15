@@ -27,6 +27,12 @@ class ContributorInfo(BaseModel):
     commits: int
     last_commit_at: datetime
 
+class CodeOwnersInfo(BaseModel):
+    file: str | None
+    coverage: float
+    files_total: int
+    files_owned: int
+
 class RecentPr(BaseModel):
     number: int
     hours: float
@@ -53,3 +59,4 @@ class ActivityMetrics(BaseModel):
     punch_card: list[list[int]] | None= None
     recent_prs: list[RecentPr]= []
     contributors: list[ContributorInfo]= []
+    code_owners: CodeOwnersInfo | None= None
