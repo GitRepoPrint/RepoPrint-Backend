@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     keycloak_audience: str= "repoprint-api"
     keycloak_url: str | None= None
     keycloak_admin_client_secret: SecretStr | None= None
+    github_client_id: str | None= None
+    github_client_secret: SecretStr | None= None
+    github_redirect_uri: str= "http://localhost:3000/api/github/callback"
+    github_oauth_url: str= "https://github.com"
+    github_api_url: str= "https://api.github.com"
+    token_encryption_key: SecretStr | None= None
 
     model_config= SettingsConfigDict(env_file=".env", extra="ignore")
 

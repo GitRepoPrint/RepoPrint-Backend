@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 import httpx
 from app.config import settings
 
-API= "https://api.github.com"
 MAX_COMMIT_PAGES= 5
 
 REPO_RE= re.compile(r"^https?://(?:www\.)?github\.com/([^/\s]+)/([^/\s#?]+?)(?:\.git)?(?:/.*)?$")
@@ -24,19 +23,22 @@ def parse_repo_url(url: str) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
-def _headers() -> dict:
+def _headers(token: str | None= None) -> dict:
     headers= {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    if settings.github_token:
-        headers["Authorization"]= f"Bearer {settings.github_token}"
+    token= token or settings.github_token
+    if token:
+        headers["Authorization"]= f"Bearer {token}"
     return headers
 
 
 async def _get(client: httpx.AsyncClient, path: str, **params) -> httpx.Response:
     response= await client.get(path, params=params or None)
-    
+
+    if response.status_code== 401:
+        raise GitHubError(401, "Token do GitHub inválido")
     if response.status_code== 404:
         raise GitHubError(404, "Repositório não encontrado ou privado")
     if response.status_code== 409:
@@ -91,13 +93,13 @@ def _is_bot(commit: dict) -> bool:
     return (commit["author"] or {}).get("type")== "Bot"
 
 
-async def fetch_activity(owner: str, repo: str) -> dict:
+async def fetch_activity(owner: str, repo: str, token: str | None= None) -> dict:
     now= datetime.now(timezone.utc)
     since_90= now - timedelta(days=90)
     since_30= now - timedelta(days=30)
     base= f"/repos/{owner}/{repo}"
-    
-    async with httpx.AsyncClient(base_url=API, headers=_headers(), timeout=15, follow_redirects=True) as client:
+
+    async with httpx.AsyncClient(base_url=settings.github_api_url, headers=_headers(token), timeout=15, follow_redirects=True) as client:
         info, total_commits, commits_30d, commits_90d, open_prs, commit_sample, closed_prs= await asyncio.gather(
             _get(client, base),
             _count(client, f"{base}/commits"),
@@ -109,6 +111,8 @@ async def fetch_activity(owner: str, repo: str) -> dict:
         )
 
         info= info.json()
+        if info.get("private") and not token:
+            raise GitHubError(404, "Repositório não encontrado ou privado")
         open_prs= open_prs or 0
         closed_prs= closed_prs or []
 
@@ -148,17 +152,19 @@ async def fetch_activity(owner: str, repo: str) -> dict:
 _cache: dict[str, tuple[datetime, dict]]= {}
 
 
-async def get_activity(owner: str, repo: str) -> dict:
+async def get_activity(owner: str, repo: str, token: str | None= None, scope: str | None= None) -> dict:
     now= datetime.now(timezone.utc)
     ttl= timedelta(seconds=settings.activity_cache_ttl_seconds)
     for expired in [k for k, (stamp, _) in _cache.items() if now - stamp >= ttl]:
         del _cache[expired]
 
     key= f"{owner}/{repo}".lower()
+    if token:
+        key= f"{key}@{scope}"
     if key in _cache:
         stamp, data= _cache[key]
         return {**data, "fetched_at": stamp, "refresh_available_at": stamp + ttl, "cached": True}
 
-    data= await fetch_activity(owner, repo)
+    data= await fetch_activity(owner, repo, token)
     _cache[key]= (now, data)
     return {**data, "fetched_at": now, "refresh_available_at": now + ttl, "cached": False}

@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -10,8 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.config import settings
+from app.db.session import get_session
+from app.models import User
 from app.services import github
-from app.services.auth import current_claims
+from app.services.auth import get_current_user
 from main import app
 
 ALEMBIC_INI= Path(__file__).resolve().parent.parent / "alembic.ini"
@@ -67,11 +70,36 @@ def anyio_backend():
     return "asyncio"
 
 
+class FakeSession:
+    def add(self, *args):
+        pass
+
+    async def commit(self):
+        pass
+
+    async def rollback(self):
+        pass
+
+    async def scalar(self, *args, **kwargs):
+        return None
+
+
 @pytest.fixture
-def signed_in():
-    app.dependency_overrides[current_claims]= lambda: {"sub": "user-1"}
+def no_database():
+    async def fake_session():
+        yield FakeSession()
+
+    app.dependency_overrides[get_session]= fake_session
     yield
-    app.dependency_overrides.pop(current_claims, None)
+    app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.fixture
+def signed_in(no_database):
+    user= User(id=uuid.uuid4(), keycloak_sub="user-1", email="user@example.com")
+    app.dependency_overrides[get_current_user]= lambda: user
+    yield user
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 @pytest.fixture(autouse=True)
@@ -103,7 +131,9 @@ def count_response(count):
 
 
 class FakeGitHub:
-    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False):
+    def __init__(self, *, total=1200, last_30d=40, last_90d=300, sample=(), closed=(), open_prs=3, open_issues_count=10, pulls=True, empty=False, missing=False, limited=False, private=False, unauthorized=False):
+        self.private= private
+        self.unauthorized= unauthorized
         self.total= total
         self.last_30d= last_30d
         self.last_90d= last_90d
@@ -122,6 +152,8 @@ class FakeGitHub:
         path= request.url.path
         params= dict(request.url.params)
 
+        if self.unauthorized:
+            return httpx.Response(401)
         if self.limited:
             return httpx.Response(403, headers={"x-ratelimit-remaining": "0"})
         if self.missing:
@@ -134,6 +166,7 @@ class FakeGitHub:
             "default_branch": "main",
             "open_issues_count": self.open_issues_count,
             "stargazers_count": 7,
+            "private": self.private,
         })
 
     def _commits(self, params):

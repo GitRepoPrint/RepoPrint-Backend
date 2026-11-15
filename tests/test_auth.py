@@ -76,10 +76,12 @@ def test_request_without_a_token_is_rejected():
     assert response.headers["www-authenticate"]== "Bearer"
 
 
-def test_valid_token_reaches_the_endpoint(install):
+async def test_valid_token_reaches_the_endpoint(install, client):
     install(FakeGitHub())
 
-    assert call_activity(bearer(make_token())).status_code== 200
+    response= await client.get("/github/activity", params={"url": "https://github.com/o/r"}, headers=bearer(make_token()))
+
+    assert response.status_code== 200
 
 
 @pytest.mark.parametrize(
@@ -110,7 +112,7 @@ def test_token_signed_with_hs256_is_rejected():
     assert call_activity(bearer(forged)).status_code== 401
 
 
-def test_keys_are_fetched_once_and_reused(keycloak):
+def test_keys_are_fetched_once_and_reused(keycloak, no_database):
     client= TestClient(app)
     token= make_token()
 
@@ -120,7 +122,7 @@ def test_keys_are_fetched_once_and_reused(keycloak):
     assert keycloak["count"]== 1
 
 
-def test_unknown_key_does_not_refetch_every_request(keycloak):
+def test_unknown_key_does_not_refetch_every_request(keycloak, no_database):
     client= TestClient(app)
     token= make_token(kid="desconhecida")
 

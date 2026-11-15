@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import String, Text, UniqueConstraint
+from sqlalchemy import LargeBinary, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IdMixin, foreign_key
@@ -17,13 +17,14 @@ class User(IdMixin, CreatedAtMixin, Base):
 
 class UserOAuth(IdMixin, CreatedAtMixin, Base):
     __tablename__= "users_oauth"
-    __table_args__= (UniqueConstraint("provider", "provider_user_id"),)
+    __table_args__= (UniqueConstraint("provider", "provider_user_id"), UniqueConstraint("user_id", "provider"))
 
     user_id: Mapped[uuid.UUID]= foreign_key("users.id")
     provider: Mapped[str]= mapped_column(String)
     provider_user_id: Mapped[str]= mapped_column(String)
-    access_token: Mapped[str]= mapped_column(Text)
-    refresh_token: Mapped[str | None]= mapped_column(Text)
+    provider_username: Mapped[str | None]= mapped_column(String)
+    access_token: Mapped[bytes]= mapped_column(LargeBinary)
+    refresh_token: Mapped[bytes | None]= mapped_column(LargeBinary)
 
 
 class Team(IdMixin, CreatedAtMixin, Base):

@@ -99,12 +99,12 @@ async def test_a_user_joins_a_team_only_once(session):
 async def test_the_same_provider_account_links_to_one_user(session):
     first= await make_user(session, "a@example.com")
     second= await make_user(session, "b@example.com")
-    session.add(UserOAuth(user_id=first.id, provider="github", provider_user_id="42", access_token="x"))
+    session.add(UserOAuth(user_id=first.id, provider="github", provider_user_id="42", access_token=b"x"))
     await session.flush()
 
     with pytest.raises(IntegrityError):
         async with session.begin_nested():
-            session.add(UserOAuth(user_id=second.id, provider="github", provider_user_id="42", access_token="y"))
+            session.add(UserOAuth(user_id=second.id, provider="github", provider_user_id="42", access_token=b"y"))
             await session.flush()
 
 
@@ -136,7 +136,7 @@ async def build_account(session, email):
     run= await make_run(session, repository, user)
     finding= ThreatFinding(analysis_run_id=run.id, category="Spoofing", threat_type="STRIDE")
     session.add_all([
-        UserOAuth(user_id=user.id, provider="github", provider_user_id=email, access_token="x"),
+        UserOAuth(user_id=user.id, provider="github", provider_user_id=email, access_token=b"x"),
         TeamMember(team_id=team.id, user_id=user.id),
         ActivityMetrics(analysis_run_id=run.id),
         DfdGraph(analysis_run_id=run.id, nodes=[], edges=[]),

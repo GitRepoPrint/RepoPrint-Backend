@@ -16,7 +16,7 @@ from app.models import (
     User,
     UserOAuth,
 )
-from app.services import audit, keycloak_admin
+from app.services import audit, github_oauth, keycloak_admin
 
 SECRET_COLUMNS= {"access_token", "refresh_token"}
 
@@ -55,6 +55,9 @@ async def export_user_data(session: AsyncSession, user: User) -> dict:
 
 
 async def delete_account(session: AsyncSession, sub: str) -> None:
+    user_id= await session.scalar(select(User.id).where(User.keycloak_sub == sub))
+    if user_id:
+        await github_oauth.revoke_stored(session, user_id)
     removed= await session.execute(delete(User).where(User.keycloak_sub == sub).returning(User.id))
     audit.record(session, "account.deleted", details={"had_account": removed.first() is not None})
     await session.commit()
