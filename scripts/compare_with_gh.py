@@ -1,28 +1,29 @@
+import asyncio
 import json
-import os
 import re
 import statistics
 import subprocess
 import sys
-import urllib.parse
-import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-BACKEND= os.environ.get("BACKEND_URL", "http://localhost:8000")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.services.github import MAX_COMMIT_PAGES, WEEKS, WEEK_SECONDS, fetch_activity
+
+TOLERANCE= 0.01
 
 
 def gh(path, *args):
     return subprocess.run(["gh", "api", *args, path], capture_output=True, text=True, check=True).stdout
 
 
+def gh_token():
+    return subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=True).stdout.strip()
+
+
 def lines(path, jq):
     return [line for line in gh(path, "--paginate", "--jq", jq).splitlines() if line.strip()]
-
-
-def backend(repo):
-    url= urllib.parse.quote(f"https://github.com/{repo}", safe="")
-    with urllib.request.urlopen(f"{BACKEND}/github/activity?url={url}", timeout=120) as response:
-        return json.load(response)
 
 
 def last_page(path):
@@ -34,23 +35,67 @@ def search_total(repo, kind):
     return json.loads(gh(f"search/issues?q=repo:{repo}+type:{kind}+state:open&per_page=1"))["total_count"]
 
 
-def reference(repo):
-    now= datetime.now(timezone.utc)
+def optional(call, default=None):
+    try:
+        return call()
+    except subprocess.CalledProcessError:
+        return default
+
+
+def reference_reviews(repo):
+    owner, name= repo.split("/")
+    query= "query($o:String!,$n:String!){repository(owner:$o,name:$n){pullRequests(last:50,states:MERGED){nodes{author{login} reviews(first:30){nodes{author{login}}}}}}}"
+    out= subprocess.run(["gh", "api", "graphql", "-f", f"query={query}", "-F", f"o={owner}", "-F", f"n={name}"], capture_output=True, text=True)
+    if out.returncode:
+        return None
+    return json.loads(out.stdout)["data"]["repository"]["pullRequests"]["nodes"]
+
+
+def share(nodes, login):
+    others= [n for n in nodes if (n["author"] or {}).get("login") != login]
+    if not others:
+        return None
+    done= sum(1 for n in others if any((r["author"] or {}).get("login") == login for r in n["reviews"]["nodes"]))
+    return round(done * 100 / len(others), 1)
+
+
+def weekly(dates, now, since):
+    counts= [0] * WEEKS
+    for moment in dates:
+        week= int((now - moment).total_seconds() // WEEK_SECONDS)
+        if 0 <= week < WEEKS:
+            counts[WEEKS - 1 - week]+= 1
+    complete= min(WEEKS, int((now - since).total_seconds() // WEEK_SECONDS))
+    return counts[WEEKS - complete:] if complete else []
+
+
+def reference(repo, now, api):
     since_30= (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
     since_90= (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    commits_90= lines(f"repos/{repo}/commits?since={since_90}&per_page=100", '.[] | {l: .author.login, t: .author.type, e: .commit.author.email}')
-    commits_90= [json.loads(line) for line in commits_90]
+    commits_90= [json.loads(line) for line in lines(f"repos/{repo}/commits?since={since_90}&per_page=100", '.[] | {l: .author.login, t: .author.type, e: .commit.author.email, d: .commit.committer.date}')]
     people= {c["l"] or c["e"] for c in commits_90 if c["t"]!= "Bot"}
     bots= {c["l"] or c["e"] for c in commits_90 if c["t"]== "Bot"}
-    try:
-        closed= json.loads(gh(f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100"))
-    except subprocess.CalledProcessError:
-        closed= []
-    hours= [
-        (datetime.fromisoformat(p["merged_at"]) - datetime.fromisoformat(p["created_at"])).total_seconds() / 3600
-        for p in closed
-        if p["merged_at"]
-    ]
+    closed= optional(lambda: json.loads(gh(f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100")), [])
+    merged= sorted((p for p in closed if p["merged_at"]), key=lambda p: p["merged_at"])
+    hours= [(datetime.fromisoformat(p["merged_at"]) - datetime.fromisoformat(p["created_at"])).total_seconds() / 3600 for p in merged]
+    info= json.loads(gh(f"repos/{repo}"))
+    default= info["default_branch"]
+    branch_total= optional(lambda: last_page(f"repos/{repo}/branches?per_page=1"))
+    protected= optional(lambda: lines(f"repos/{repo}/branches?protected=true&per_page=100", ".[].name"))
+    runs= optional(lambda: json.loads(gh(f"repos/{repo}/actions/runs?branch={default}&status=completed&per_page=1")))
+    run= (runs or {}).get("workflow_runs") or []
+    sample= commits_90[: MAX_COMMIT_PAGES * 100]
+    dates= [datetime.fromisoformat(c["d"]).astimezone(timezone.utc) for c in sample]
+    per_login= {}
+    for c in sample:
+        if c["t"]!= "Bot" and c["l"]:
+            per_login[c["l"]]= per_login.get(c["l"], 0) + 1
+    window= api["contributors_window"]
+    head= json.loads(gh(f"repos/{repo}/commits?per_page=1"))[0]["sha"]
+    tree= json.loads(gh(f"repos/{repo}/git/trees/{head}?recursive=1"))
+    blobs= [e["path"] for e in tree["tree"] if e["type"]== "blob"]
+    owners_file= next((p for p in (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS") if optional(lambda p=p: gh(f"repos/{repo}/contents/{p}?ref={head}"))), None)
+    errors= optional(lambda: json.loads(gh(f"repos/{repo}/codeowners/errors?ref={head}")).get("errors", []), None)
     return {
         "total_commits": last_page(f"repos/{repo}/commits?per_page=1"),
         "commits_30d": last_page(f"repos/{repo}/commits?since={since_30}&per_page=1"),
@@ -60,39 +105,100 @@ def reference(repo):
         "median_pr_merge_time": round(statistics.median(hours), 1) if hours else None,
         "open_prs": search_total(repo, "pr"),
         "open_issues": search_total(repo, "issue"),
+        "commit_sha": json.loads(gh(f"repos/{repo}/commits?per_page=1"))[0]["sha"],
+        "license": (info.get("license") or {}).get("spdx_id"),
+        "branches_total": branch_total,
+        "protected": protected,
+        "default_protected": None if protected is None else default in protected,
+        "ci_conclusion": run[0]["conclusion"] if run else None,
+        "login_commits": per_login,
+        "review_nodes": reference_reviews(repo),
+        "owners_file": owners_file,
+        "tree_files": None if tree.get("truncated") else len(blobs),
+        "owners_errors": None if errors is None else len(errors),
+        "weekly_commits": weekly(dates, now, window["since"] if not window["complete"] else now - timedelta(days=90)),
+        "recent_prs": [{"number": p["number"], "hours": round(h, 1)} for p, h in zip(merged[-10:], hours[-10:])],
     }
 
 
-def verdict(api, ref, lower_bound=False):
+def close(api, ref, lower_bound=False):
     if api is None or ref is None:
-        return "OK " if api== ref else "DIF"
-    if abs(api - ref) <= max(2, 0.01 * ref):
-        return "OK "
-    if lower_bound and api < ref:
-        return "MIN"
-    return "DIF"
+        return api== ref
+    if abs(api - ref) <= max(2, TOLERANCE * ref):
+        return True
+    return lower_bound and api < ref
 
 
-def main(repos):
+def verdict(ok, minimum=False):
+    return "MIN" if minimum else ("OK " if ok else "DIF")
+
+
+def rows(api, ref):
+    raw= api["raw_metrics"]
+    window= api["contributors_window"]
+    branches= api["branches"] or {}
+    unknown= ref["protected"] is None or ref["branches_total"] is None or not api["branches"]
+    ci= api["ci"] or {}
+    partial= not window["complete"]
+    list_ok= lambda a, b: len(a)== len(b) and all(abs(x - y) <= max(1, TOLERANCE * y) for x, y in zip(a, b))
+    return [
+        ("total_commits", api["total_commits"], ref["total_commits"], close(api["total_commits"], ref["total_commits"])),
+        ("commits_30d", raw["commits_last_30d"], ref["commits_30d"], close(raw["commits_last_30d"], ref["commits_30d"])),
+        ("commits_90d", raw["commits_last_90d"], ref["commits_90d"], close(raw["commits_last_90d"], ref["commits_90d"])),
+        ("active_contributors", api["active_contributors"], ref["active_contributors"], close(api["active_contributors"], ref["active_contributors"], partial)),
+        ("bots_excluded", api["bots_excluded"], ref["bots_excluded"], close(api["bots_excluded"], ref["bots_excluded"], partial)),
+        ("median_pr_merge_time", api["median_pr_merge_time"], ref["median_pr_merge_time"], close(api["median_pr_merge_time"], ref["median_pr_merge_time"])),
+        ("open_prs", raw["open_prs"], ref["open_prs"], close(raw["open_prs"], ref["open_prs"])),
+        ("open_issues", api["open_issues"], ref["open_issues"], close(api["open_issues"], ref["open_issues"])),
+        ("commit_sha", api["commit_sha"], ref["commit_sha"], api["commit_sha"]== ref["commit_sha"]),
+        ("license", (api["license"] or {}).get("spdx_id"), ref["license"], (api["license"] or {}).get("spdx_id")== ref["license"]),
+        ("branches_total", branches.get("total"), ref["branches_total"], unknown or close(branches.get("total"), ref["branches_total"])),
+        ("protected_branches", len(branches.get("protected", [])), None if unknown else len(ref["protected"]), unknown or sorted(branches.get("protected", []))== sorted(ref["protected"][:100]) or close(len(branches.get("protected", [])), len(ref["protected"]))),
+        ("default_protected", branches.get("default_protected"), ref["default_protected"], unknown or branches.get("default_protected")== ref["default_protected"]),
+        ("ci_conclusion", ci.get("conclusion"), ref["ci_conclusion"], ci.get("conclusion")== ref["ci_conclusion"]),
+        ("top_contributors", [(p["login"], p["commits"]) for p in api["contributors"] if p["login"]][:3], [(p["login"], ref["login_commits"].get(p["login"])) for p in api["contributors"] if p["login"]][:3], all(ref["login_commits"].get(p["login"])== p["commits"] for p in api["contributors"] if p["login"])),
+        ("contributors_sorted", len(api["contributors"]), min(len(ref["login_commits"]), 10), [p["commits"] for p in api["contributors"]]== sorted((p["commits"] for p in api["contributors"]), reverse=True)),
+        ("codeowners_file", (api["code_owners"] or {}).get("file"), ref["owners_file"], api["code_owners"] is None or api["code_owners"]["file"]== ref["owners_file"]),
+        ("codeowners_files_total", (api["code_owners"] or {}).get("files_total"), ref["tree_files"], api["code_owners"] is None or ref["tree_files"] is None or api["code_owners"]["files_total"]== ref["tree_files"]),
+        ("codeowners_coverage_in_range", (api["code_owners"] or {}).get("coverage"), f"file errors={ref['owners_errors']}", api["code_owners"] is None or (0 <= api["code_owners"]["coverage"] <= 100 and (api["code_owners"]["file"] is not None or api["code_owners"]["coverage"]== 0))),
+        ("review_participation", {p["login"]: p["review_participation"] for p in api["contributors"] if p["login"]}, {p["login"]: share(ref["review_nodes"] or [], p["login"]) for p in api["contributors"] if p["login"]}, all(p["review_participation"]== share(ref["review_nodes"] or [], p["login"]) for p in api["contributors"] if p["login"])),
+        ("reviews_sampled", api["reviews_sampled"], len(ref["review_nodes"] or []), api["reviews_sampled"]== len(ref["review_nodes"] or [])),
+        ("weekly_commits", api["weekly_commits"], ref["weekly_commits"], list_ok(api["weekly_commits"], ref["weekly_commits"])),
+        ("recent_prs", [p["number"] for p in api["recent_prs"]], [p["number"] for p in ref["recent_prs"]], [(p["number"], p["hours"]) for p in api["recent_prs"]]== [(p["number"], p["hours"]) for p in ref["recent_prs"]]),
+    ]
+
+
+def own_checks(api):
+    window= api["contributors_window"]
+    punch= api["punch_card"]
+    checks= [("punch_card_sum_is_commits_read", sum(map(sum, punch)) if punch else 0, window["commits_read"], (sum(map(sum, punch)) if punch else 0)== window["commits_read"])]
+    if api["branches"]:
+        checks.append(("default_branch_listed", api["default_branch"] in api["branches"]["names"], True, api["default_branch"] in api["branches"]["names"] or api["branches"]["total"] > 100))
+    return checks
+
+
+async def check(repo, token):
+    owner, name= repo.split("/")
+    now= datetime.now(timezone.utc)
+    api= await fetch_activity(owner, name, token)
+    ref= reference(repo, now, api)
+    print(f"== {repo} (contributors window complete={api['contributors_window']['complete']}, commits read={api['contributors_window']['commits_read']})")
+    failed= 0
+    for label, value, expected, ok in rows(api, ref) + own_checks(api):
+        minimum= not ok and label in ("active_contributors", "bots_excluded") and not api["contributors_window"]["complete"]
+        failed+= 0 if ok or minimum else 1
+        print(f"  {verdict(ok, minimum)} {label:30} api={str(value)[:60]:60} gh={str(expected)[:60]}")
+    return failed
+
+
+async def main(repos):
+    token= gh_token()
+    failed= 0
     for repo in repos:
-        api= backend(repo)
-        ref= reference(repo)
-        raw= api["raw_metrics"]
-        window= api["contributors_window"]
-        rows= [
-            ("total_commits", api["total_commits"], ref["total_commits"], False),
-            ("commits_30d", raw["commits_last_30d"], ref["commits_30d"], False),
-            ("commits_90d", raw["commits_last_90d"], ref["commits_90d"], False),
-            ("active_contributors", api["active_contributors"], ref["active_contributors"], not window["complete"]),
-            ("bots_excluded", api["bots_excluded"], ref["bots_excluded"], not window["complete"]),
-            ("median_pr_merge_time", api["median_pr_merge_time"], ref["median_pr_merge_time"], False),
-            ("open_prs", raw["open_prs"], ref["open_prs"], False),
-            ("open_issues", api["open_issues"], ref["open_issues"], False),
-        ]
-        print(f"== {repo} (cached={api['cached']}, contributors window complete={window['complete']}, commits read={window['commits_read']})")
-        for name, value, expected, lower_bound in rows:
-            print(f"  {verdict(value, expected, lower_bound)} {name:22} api={value!s:10} gh={expected}")
+        failed+= await check(repo, token)
+    print("FAIL" if failed else "ALL OK", f"({failed} differences)" if failed else "")
+    return 1 if failed else 0
 
 
 if __name__== "__main__":
-    main(sys.argv[1:])
+    sys.exit(asyncio.run(main(sys.argv[1:])))
