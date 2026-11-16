@@ -1,0 +1,484 @@
+{
+"categories": {
+    "linkability": "Linkability",
+    "identifiability": "Identifiability",
+    "non_repudiation": "Non-repudiation",
+    "detectability": "Detectability",
+    "disclosure_of_information": "Disclosure of information",
+    "unawareness": "Unawareness",
+    "non_compliance": "Non-compliance"
+  },
+  
+"dfd_properties": {
+    "handlesCardPayment": "Card payment",
+    "isALog": "Is a Log",
+    "isEncrypted": "Encrypted",
+    "isSigned": "Signed",
+    "isWebApplication": "Web Application",
+    "providesAuthentication": "Provides Authentication",
+    "publicNetwork": "Public Network",
+    "storesCredentials": "Stores Credentials"
+},
+
+"data_types": [
+    "direct_identifier",
+    "pseudo_identifier",
+    "credential",
+    "general_data"
+  ],
+  
+"rules": [
+    {
+      "id": "L1",
+      "category": "Linkability",
+      "applies_to": "data_flow",
+      "severity": "High",
+      "conditions": {
+        "direction": "inbound",
+        "data_type": "direct_identifier",
+        "is_pseudonymized": false
+      },
+      "title": "Linked user requests",
+      "description": "User requests can be linked because they contain a unique identifier across sessions or services.",
+      "gdpr_articles": ["Art. 5(1)(c)", "Art. 25"],
+      "mitigation": "Use scoped, rotating pseudonyms or session-specific tokens instead of global identifiers."
+    },
+    {
+      "id": "L2",
+      "category": "Linkability",
+      "applies_to": "data_flow",
+      "severity": "Medium",
+      "conditions": {
+        "direction": "inbound",
+        "data_type": "pseudo_identifier"
+      },
+      "title": "Linkable user requests",
+      "description": "User requests contain attributes that can be combined into quasi-identifiers (e.g. fingerprints, locations).",
+      "gdpr_articles": ["Art. 4(1)", "Art. 25"],
+      "mitigation": "Minimize metadata transmission, generalize timestamps, and restrict client fingerprinting attributes."
+    },
+    {
+      "id": "L3",
+      "category": "Linkability",
+      "applies_to": "data_flow",
+      "severity": "Low",
+      "conditions": {
+        "direction": "inbound",
+        "has_distinguishable_patterns": true
+      },
+      "title": "Linking through distinguishable patterns",
+      "description": "Patterns in request metadata, timing, or payload structure allow linking distinct requests to one user.",
+      "gdpr_articles": ["Art. 25"],
+      "mitigation": "Introduce message padding, batch requests, or randomize dispatch intervals."
+    },
+    {
+      "id": "L4",
+      "category": "Linkability",
+      "applies_to": "data_store",
+      "severity": "High",
+      "conditions": {
+        "stores_raw_data": true,
+        "contains_pseudo_identifiers": true
+      },
+      "title": "Linkable dataset",
+      "description": "Stored personal or activity data contains fine-grained attributes that enable cross-record correlation.",
+      "gdpr_articles": ["Art. 5(1)(c)", "Art. 6(4)"],
+      "mitigation": "Apply k-anonymity, differential privacy, or aggregate historical entries."
+    },
+    {
+      "id": "L5",
+      "category": "Linkability",
+      "applies_to": "process",
+      "severity": "Medium",
+      "conditions": {
+        "derives_patterns": true,
+        "builds_user_profiles": true
+      },
+      "title": "Profiling users",
+      "description": "Analyzing data points for behavioral or emotional patterns to link actions and construct profiles.",
+      "gdpr_articles": ["Art. 21", "Art. 22"],
+      "mitigation": "Enforce explicit consent for profiling, provide opt-outs, and decouple analytical profiles from raw IDs."
+    },
+    {
+      "id": "I1",
+      "category": "Identifiability",
+      "applies_to": "data_flow",
+      "severity": "High",
+      "conditions": {
+        "direction": "inbound",
+        "data_type": "direct_identifier"
+      },
+      "title": "Identified user requests",
+      "description": "Incoming user requests contain explicit identity data (e.g. full name, email, credentials).",
+      "gdpr_articles": ["Art. 5(1)(c)", "Art. 25"],
+      "mitigation": "Avoid requesting direct identity data when pseudonymous authentication or zero-knowledge proofs suffice."
+    },
+    {
+      "id": "I2",
+      "category": "Identifiability",
+      "applies_to": "data_flow",
+      "severity": "Medium",
+      "conditions": {
+        "direction": "inbound",
+        "contains_inferable_identity": true
+      },
+      "title": "Identifiable user requests",
+      "description": "Requests do not carry names but contain behavior or contextual attributes sufficiently unique to infer identity.",
+      "gdpr_articles": ["Art. 4(1)"],
+      "mitigation": "Generalize input parameters, coarsen location coordinates, and redact granular search parameters."
+    },
+    {
+      "id": "I3",
+      "category": "Identifiability",
+      "applies_to": "data_flow",
+      "severity": "Medium",
+      "conditions": {
+        "direction": "inbound",
+        "accepts_free_form_text": true
+      },
+      "title": "Identifiable data flows",
+      "description": "Free-form or unconstrained user data (e.g. feedback, crash traces) contains accidentally submitted identifiers.",
+      "gdpr_articles": ["Art. 25"],
+      "mitigation": "Implement automated regex or NER filtering to scrub personal attributes before payload ingestion."
+    },
+    {
+      "id": "I4",
+      "category": "Identifiability",
+      "applies_to": "data_flow",
+      "severity": "High",
+      "conditions": {
+        "direction": "inbound",
+        "recycles_global_identifiers": true
+      },
+      "title": "Identifiers in data requests",
+      "description": "Communication reuses universal identifiers across distinct third-party API queries or outbound calls.",
+      "gdpr_articles": ["Art. 5(1)(c)"],
+      "mitigation": "Generate independent, transient tokens tailored strictly per external integration endpoint."
+    },
+    {
+      "id": "I5",
+      "category": "Identifiability",
+      "applies_to": "data_store",
+      "severity": "High",
+      "conditions": {
+        "contains_quasi_identifiers": true,
+        "re_identification_risk": true
+      },
+      "title": "Identifiable dataset",
+      "description": "Stored records contain combined demographic, operational, or location attributes that allow re-identification.",
+      "gdpr_articles": ["Art. 4(1)", "Art. 32"],
+      "mitigation": "Apply l-diversity, t-closeness, or noise injection to stored analytical tables."
+    },
+    {
+      "id": "Nr1",
+      "category": "Non-repudiation",
+      "applies_to": "process",
+      "severity": "Low",
+      "conditions": {
+        "isALog": true,
+        "stores_authenticated_identity": true
+      },
+      "title": "Non-repudiation of service usage",
+      "description": "Users cannot deny having accessed a service because access logs tie session operations to explicit identities.",
+      "gdpr_articles": ["Art. 5(1)(c)"],
+      "mitigation": "Segregate audit identities, use blind tokens, or purge non-essential access logs periodically."
+    },
+    {
+      "id": "Nr2",
+      "category": "Non-repudiation",
+      "applies_to": "data_flow",
+      "severity": "Low",
+      "conditions": {
+        "direction": "inbound",
+        "isSigned": true
+      },
+      "title": "Non-repudiation of sending",
+      "description": "Transmitted payloads or messages are digitally signed, preventing data subjects from refuting authorship.",
+      "gdpr_articles": ["Art. 5(1)(c)"],
+      "mitigation": "Use ephemeral keys or deniable authentication schemes if persistent non-repudiation is not legally required."
+    },
+    {
+      "id": "Nr3",
+      "category": "Non-repudiation",
+      "applies_to": "data_flow",
+      "severity": "Low",
+      "conditions": {
+        "direction": "outbound",
+        "generates_receipt_evidence": true
+      },
+      "title": "Non-repudiation of receipt",
+      "description": "Outbound deliveries automatically trigger receipts, telemetry pings, or read markers confirming delivery.",
+      "gdpr_articles": ["Art. 5(1)(a)"],
+      "mitigation": "Make delivery confirmations opt-in and eliminate automated tracking pixels."
+    },
+    {
+      "id": "Nr4",
+      "category": "Non-repudiation",
+      "applies_to": "data_store",
+      "severity": "Medium",
+      "conditions": {
+        "is_append_only": true,
+        "prevents_erasure": true
+      },
+      "title": "Non-repudiation of storage",
+      "description": "Data is stored on immutable or append-only structures, eliminating plausible deniability and right-to-erasure.",
+      "gdpr_articles": ["Art. 17"],
+      "mitigation": "Store cryptographic commitments or off-chain state instead of persisting raw records on immutable ledgers."
+    },
+    {
+      "id": "Nr5",
+      "category": "Non-repudiation",
+      "applies_to": "process",
+      "severity": "Low",
+      "conditions": {
+        "embeds_metadata": true
+      },
+      "title": "Non-repudiation of hidden data or metadata",
+      "description": "Document generation or image exports retain embedded author metadata, revision logs, or invisible watermarks.",
+      "gdpr_articles": ["Art. 5(1)(c)"],
+      "mitigation": "Sanitize and strip EXIF, author tags, and build environment variables prior to document dispatch."
+    },
+    {
+      "id": "D1",
+      "category": "Detectability",
+      "applies_to": "data_flow",
+      "severity": "Medium",
+      "conditions": {
+        "direction": "outbound",
+        "reveals_resource_existence": true
+      },
+      "title": "Detectable users",
+      "description": "System responses differentiate between 'wrong password' and 'user does not exist', leaking identity status.",
+      "gdpr_articles": ["Art. 32"],
+      "mitigation": "Return uniform generic error responses and equalize execution time for authentication failures."
+    },
+    {
+      "id": "D2",
+      "category": "Detectability",
+      "applies_to": "data_flow",
+      "severity": "Medium",
+      "conditions": {
+        "publicNetwork": true,
+        "isEncrypted": false
+      },
+      "title": "Detectable service usage",
+      "description": "Unencrypted or observable transmission endpoints allow network observers to detect interaction with the service.",
+      "gdpr_articles": ["Art. 32"],
+      "mitigation": "Enforce strict TLS encryption, DNS-over-HTTPS, and mask server endpoint semantics."
+    },
+    {
+      "id": "D3",
+      "category": "Detectability",
+      "applies_to": "process",
+      "severity": "Low",
+      "conditions": {
+        "observable_side_effects": true
+      },
+      "title": "Detectable events",
+      "description": "Application events produce observable side effects (e.g. disk size shifts, bursts of traffic, temporary lock files).",
+      "gdpr_articles": ["Art. 25"],
+      "mitigation": "Pad network packet lengths, normalize file processing sizes, and suppress public status indicators."
+    },
+    {
+      "id": "D4",
+      "category": "Detectability",
+      "applies_to": "process",
+      "severity": "Medium",
+      "conditions": {
+        "reveals_record_existence": true
+      },
+      "title": "Detectable records",
+      "description": "Data retrieval queries or error codes leak whether an individual record or identifier exists in storage.",
+      "gdpr_articles": ["Art. 32"],
+      "mitigation": "Return standard HTTP 404 or generic access denial regardless of whether the record exists."
+    },
+    {
+      "id": "DD1",
+      "category": "Disclosure of information",
+      "applies_to": "data_flow",
+      "severity": "High",
+      "conditions": {
+        "direction": "inbound",
+        "collects_excessive_sensitivity": true
+      },
+      "title": "Excessively sensitive data collected",
+      "description": "The application ingests finer-grained or more sensitive personal data than necessary for core features.",
+      "gdpr_articles": ["Art. 5(1)(c)", "Art. 9"],
+      "mitigation": "Remove ingestion of non-essential attributes (e.g. precise GPS, biometric vectors) at the boundary."
+    },
+    {
+      "id": "DD2",
+      "category": "Disclosure of information",
+      "applies_to": "data_flow",
+      "severity": "Medium",
+      "conditions": {
+        "direction": "inbound",
+        "high_collection_frequency": true
+      },
+      "title": "Excessive amount of data collected",
+      "description": "System queries or collects records at higher frequencies or larger volume batches than strictly needed.",
+      "gdpr_articles": ["Art. 5(1)(c)"],
+      "mitigation": "Throttle ingestion, batch summary rollups, and pull updates on demand rather than continuous streaming."
+    },
+    {
+      "id": "DD3",
+      "category": "Disclosure of information",
+      "applies_to": "process",
+      "severity": "Medium",
+      "conditions": {
+        "performs_unnecessary_enrichment": true
+      },
+      "title": "Unnecessary data analysis",
+      "description": "Internal processes perform enrichment, automated classification, or analytics unrelated to primary service scope.",
+      "gdpr_articles": ["Art. 5(1)(b)"],
+      "mitigation": "Decouple analytics pipelines and require operational isolation for post-processing routines."
+    },
+    {
+      "id": "DD4",
+      "category": "Disclosure of information",
+      "applies_to": "data_store",
+      "severity": "High",
+      "conditions": {
+        "has_retention_policy": false
+      },
+      "title": "Unnecessary data retention",
+      "description": "Data is persisted indefinitely without time-to-live expiration or scheduled pruning procedures.",
+      "gdpr_articles": ["Art. 5(1)(e)"],
+      "mitigation": "Implement automated cron jobs or database retention TTLs to delete stale records."
+    },
+    {
+      "id": "DD5",
+      "category": "Disclosure of information",
+      "applies_to": "data_flow",
+      "severity": "High",
+      "conditions": {
+        "direction": "outbound",
+        "exposes_to_third_parties": true
+      },
+      "title": "Overexposure of personal data",
+      "description": "Personal records are shared broadly with external APIs, analytics partners, or client dashboards.",
+      "gdpr_articles": ["Art. 5(1)(c)", "Art. 28"],
+      "mitigation": "Apply strict output projections, whitelist exposed attributes, and audit third-party data flows."
+    },
+    {
+      "id": "U1",
+      "category": "Unawareness",
+      "applies_to": "data_flow",
+      "severity": "Medium",
+      "conditions": {
+        "direction": "inbound",
+        "lacks_processing_notice": true
+      },
+      "title": "Insufficient transparency",
+      "description": "Data subjects submit information without clear disclosure of processing scopes, sinks, or downstream sharing.",
+      "gdpr_articles": ["Art. 12", "Art. 13", "Art. 14"],
+      "mitigation": "Provide contextual, concise privacy notices at input collection forms."
+    },
+    {
+      "id": "U2",
+      "category": "Unawareness",
+      "applies_to": "data_flow",
+      "severity": "Medium",
+      "conditions": {
+        "direction": "inbound",
+        "shares_data_of_others": true
+      },
+      "title": "Insufficient information when sharing data of others",
+      "description": "Users upload address books, media, or third-party details without verifying consent or notice mechanisms.",
+      "gdpr_articles": ["Art. 14"],
+      "mitigation": "Prompt uploaders for verification and provide opt-out channels for named third parties."
+    },
+    {
+      "id": "U3",
+      "category": "Unawareness",
+      "applies_to": "process",
+      "severity": "Medium",
+      "conditions": {
+        "lacks_preference_controls": true
+      },
+      "title": "Insufficient privacy controls",
+      "description": "The system does not offer user-facing controls to configure processing preferences, tracking toggles, or consent states.",
+      "gdpr_articles": ["Art. 7", "Art. 25"],
+      "mitigation": "Build preference management dashboards defaulting to highest-privacy configurations."
+    },
+    {
+      "id": "U4",
+      "category": "Unawareness",
+      "applies_to": "data_store",
+      "severity": "High",
+      "conditions": {
+        "provides_user_access": false
+      },
+      "title": "Insufficient access",
+      "description": "Data subjects cannot retrieve, view, or export the personal records collected and stored about them.",
+      "gdpr_articles": ["Art. 15", "Art. 20"],
+      "mitigation": "Expose self-service data export APIs or standardized take-out archives."
+    },
+    {
+      "id": "U5",
+      "category": "Unawareness",
+      "applies_to": "data_store",
+      "severity": "High",
+      "conditions": {
+        "provides_rectification_erasure": false
+      },
+      "title": "Insufficient rectification or erasure",
+      "description": "System lacks functionality allowing individuals to update inaccurate data or execute hard deletions.",
+      "gdpr_articles": ["Art. 16", "Art. 17"],
+      "mitigation": "Implement endpoints supporting atomic profile updates and hard record deletion cascading across stores."
+    },
+    {
+      "id": "Nc1",
+      "category": "Non-compliance",
+      "applies_to": "process",
+      "severity": "Critical",
+      "conditions": {
+        "lacks_legal_basis": true
+      },
+      "title": "Non-compliance of processing with applicable regulations",
+      "description": "Personal data operations lack a documented legal ground (e.g. consent, contract necessity, legitimate interest).",
+      "gdpr_articles": ["Art. 6", "Art. 9"],
+      "mitigation": "Enforce legal basis tagging on all ingestion pipelines and block processing without valid basis flags."
+    },
+    {
+      "id": "Nc2",
+      "category": "Non-compliance",
+      "applies_to": "process",
+      "severity": "Medium",
+      "conditions": {
+        "deviates_from_privacy_standards": true
+      },
+      "title": "Non-adherence to privacy standards",
+      "description": "Architecture lacks documented adherence to established privacy engineering frameworks (ISO 27701, NIST Privacy).",
+      "gdpr_articles": ["Art. 25"],
+      "mitigation": "Align telemetry, storage, and processing controls with NIST Privacy Framework or ISO/IEC 27701."
+    },
+    {
+      "id": "Nc3",
+      "category": "Non-compliance",
+      "applies_to": "process",
+      "severity": "Medium",
+      "conditions": {
+        "lacks_lifecycle_management": true
+      },
+      "title": "Improper data lifecycle management",
+      "description": "Absence of structured lifecycle state transitions (collection, validation, archiving, permanent destruction).",
+      "gdpr_articles": ["Art. 5(1)(e)", "Art. 25"],
+      "mitigation": "Formulate programmatic data lifecycle state machines enforcing archival and deletion triggers."
+    },
+    {
+      "id": "Nc4",
+      "category": "Non-compliance",
+      "applies_to": "process",
+      "severity": "Critical",
+      "conditions": {
+        "isEncrypted": false,
+        "storesCredentials": true
+      },
+      "title": "Insufficient security of processing",
+      "description": "Security measures fail to protect personal records against unauthorized processing, theft, or compromise.",
+      "gdpr_articles": ["Art. 5(1)(f)", "Art. 32"],
+      "mitigation": "Implement end-to-end encryption, strict role-based access control, and regular vulnerability scanning."
+    }
+  ]
+}
