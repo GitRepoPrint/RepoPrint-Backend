@@ -8,11 +8,6 @@ from typing import Any, Dict, List
 @lru_cache(maxsize=1)
 def load_catalog() -> Dict[str, Any]:
     catalog_path = Path(__file__).with_name("linddun_catalog.json")
-    if not catalog_path.exists():
-        # Fallback para o directório original se não estiver local
-        fallback = Path(__file__).resolve().parent.parent.parent / "engine" / "linddun" / "linddun_catalog.json"
-        catalog_path = fallback
-
     with open(catalog_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
