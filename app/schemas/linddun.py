@@ -19,7 +19,17 @@ LinddunCategory = Literal[
 TargetType = Literal["process", "data_store", "data_flow", "external_entity", "actor"]
 
 
-class LinddunFinding(BaseModel):
+class DictLikeModel(BaseModel):
+    """Modelo base que permite acesso estilo dicionário para compatibilidade retroativa."""
+
+    def __getitem__(self, item: str) -> Any:
+        return getattr(self, item)
+
+    def get(self, item: str, default: Any = None) -> Any:
+        return getattr(self, item, default)
+
+
+class LinddunFinding(DictLikeModel):
     threat_id: str
     category: str
     severity: str
@@ -36,13 +46,13 @@ class LinddunFinding(BaseModel):
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
-class LinddunSummary(BaseModel):
+class LinddunSummary(DictLikeModel):
     total_findings: int
     by_category: dict[str, int] = Field(default_factory=dict)
     by_severity: dict[str, int] = Field(default_factory=dict)
 
 
-class LinddunReport(BaseModel):
+class LinddunReport(DictLikeModel):
     repository: str
     analyzed_at: datetime
     summary: LinddunSummary
