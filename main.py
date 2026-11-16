@@ -4,6 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import dfd, github
 from app.services.guard import DfdGuard
+from app.routers import github, health, me, repositories
+
+app= FastAPI(title="RepoPrint Backend")
+app.include_router(github.router)
+app.include_router(health.router)
+app.include_router(me.router)
+app.include_router(repositories.router)
 
 
 def create_app() -> FastAPI:
