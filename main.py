@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import dfd, github
+from app.routers import dfd, github, linddun
 from app.services.guard import DfdGuard
 
 
@@ -20,6 +20,7 @@ def create_app() -> FastAPI:
     app.state.guard= DfdGuard.from_settings(settings)
     app.include_router(github.router)
     app.include_router(dfd.router)
+    app.include_router(linddun.router)
 
     @app.get("/health")
     async def root():
