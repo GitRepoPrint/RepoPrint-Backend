@@ -19,6 +19,13 @@ from app.services import github
 from app.services.auth import get_current_user
 from main import app
 
+@pytest.fixture(autouse=True)
+def archive_only_fetching(monkeypatch):
+    """Nenhum teste fala com o GitHub: os do GET /dfd trocam o arquivo por um de teste (`dfd_router.download_archive`);
+    os do descarregamento ficheiro a ficheiro (tests/test_code_fetcher.py) pedem-no de propósito."""
+    monkeypatch.setattr(settings, "dfd_fetch_method", "archive")
+
+
 ALEMBIC_INI= Path(__file__).resolve().parent.parent / "alembic.ini"
 
 

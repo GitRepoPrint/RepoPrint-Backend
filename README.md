@@ -15,6 +15,7 @@ uv run pytest
 | `GET /health` | `{"status": "ok"}` |
 | `GET /github/activity?url=` | commit, contributor and pull-request metrics |
 | `GET /dfd?url=&group_by=directory\|file` | the code-level data flow diagram, as a graph (`docs/dfd-schema.md` in the root repository) |
+| `GET /dfd/stream?url=&group_by=` | the same analysis as NDJSON, one JSON line per event, so a page can show real progress (see below) |
 
 ## Settings
 
@@ -24,7 +25,42 @@ Read from the environment or from a `.env` file.
 |---|---|---|
 | `GITHUB_TOKEN` | none | Raises GitHub's rate limit from 60 to 5,000 requests per hour. |
 | `ACTIVITY_CACHE_TTL_SECONDS` | `600` | How long `/github/activity` answers are cached in memory. |
+| `DFD_FETCH_METHOD` | `auto` | `auto` reads the code file by file (see "How the code is read"), falling back to the whole archive if that fails; `archive` always downloads the archive. |
+| `DFD_FETCH_CONCURRENCY` | `48` | Requests to `raw.githubusercontent.com` at the same time (only without a token). |
+| `GITHUB_RAW_URL` | `https://raw.githubusercontent.com` | Where raw files come from. |
 | `CORS_ORIGINS` | `http://localhost:3000` | Origins (comma-separated, or `*`) whose pages may call this API from a browser. Read-only: GET, no cookies. |
+
+### How the code is read
+
+GitHub's archive (`/tarball`) is generated on the fly and downloads everything: 13 to 17 s for FastAPI (18 MB), and it never finishes for
+something like the Linux kernel (250 MB, and GitHub answers 429). So `/dfd` lists the files with one Git Trees request (a very big
+repository is listed folder by folder) and reads only the source files:
+
+1. **With a `GITHUB_TOKEN`:** about 100 files per GraphQL request, asked for by blob sha (0.6 s per request; asking by path takes 2 to 5 s).
+   Up to 2,500 files.
+2. **Without a token:** one request per file to `raw.githubusercontent.com`, 48 at a time, up to 1,200 files (it has its own rate limit).
+3. **If that fails** (the network, or most files cannot be read): the whole archive, as before. A repository that does not exist or a
+   GitHub rate limit is an error and is not retried another way.
+
+A repository with more source files than the limit is **sampled**: folders closest to the root first, one file per folder in turn so
+that no huge folder (`drivers/` in Linux) takes everyone's place, and product code before tests, docs, examples and scripts. The result
+says so (`meta.stats`: `files_found`, `files_parsed`, `sampled`, `listing_truncated`, `fetch_method`). Compiled files such as `.mo` are
+never picked. Parsing a repository of 400 files or more is split over up to 4 processes (threads do not help: the GIL).
+
+Measured (live): FastAPI 6.7 s (was 16 to 20 s); Django 11 s; Linux 33 to 40 s for a sample of 2,500 of 75,317 files (was a failure).
+
+### Progress: `GET /dfd/stream`
+
+Same parameters, guards and cache as `GET /dfd`; the answer is `application/x-ndjson`:
+
+```
+{"type":"progress","stage":"listing|downloading|parsing|building","done":120,"total":1046}   (total 0: not known)
+{"type":"result","graph":{...}}                       the same graph as GET /dfd
+{"type":"error","status":404,"detail":"..."}          the analysis failed (after it started)
+```
+
+A bad address, the per-client limit (429) and a busy server (503) are normal HTTP errors, before anything is streamed. A result that is
+already cached is a single `result` line. If the client disconnects the work stops and the slot is given back.
 
 ### Protecting `/dfd`
 
