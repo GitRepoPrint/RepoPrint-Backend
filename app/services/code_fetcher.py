@@ -6,7 +6,8 @@ from dataclasses import dataclass
 import httpx
 from tree_sitter_language_pack import detect_language_from_path
 
-from app.services.github import API, GitHubError, _headers
+from app.config import settings
+from app.services.github import GitHubError, _headers
 
 MAX_ARCHIVE_BYTES= 100 * 1024 * 1024
 MAX_FILE_BYTES= 1024 * 1024
@@ -72,7 +73,7 @@ def read_archive(archive: io.IOBase) -> list[SourceFile]:
 async def download_archive(owner: str, repo: str) -> tempfile.SpooledTemporaryFile:
     spool= tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024)
     try:
-        async with httpx.AsyncClient(base_url=API, headers=_headers(), timeout=60, follow_redirects=True) as client:
+        async with httpx.AsyncClient(base_url=settings.github_api_url, headers=_headers(), timeout=60, follow_redirects=True) as client:
             async with client.stream("GET", f"/repos/{owner}/{repo}/tarball") as response:
                 if response.is_error:
                     _raise_for(response)
