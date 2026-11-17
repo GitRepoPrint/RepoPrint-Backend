@@ -2,27 +2,27 @@
   "categories": {
     "Spoofing": {
       "letter": "S",
-      "description": "Falsificação de identidade - Personificação de utilizadores, serviços ou componentes legítimos."
+      "description": "Identity Spoofing - Impersonating legitimate users, services, or system components."
     },
     "Tampering": {
       "letter": "T",
-      "description": "Adulteração - Modificação não autorizada de dados em repouso, trânsito ou integridade de código."
+      "description": "Data Tampering - Unauthorized modification of data at rest, data in transit, or code integrity."
     },
     "Repudiation": {
       "letter": "R",
-      "description": "Repúdio - Execução de ações sem capacidade de auditoria, rastreabilidade ou não-repúdio."
+      "description": "Repudiation - Performing actions without accountability, auditability, or non-repudiation tracing."
     },
     "Information Disclosure": {
       "letter": "I",
-      "description": "Divulgação de informação - Fuga, interceção ou acesso indevido a dados sensíveis."
+      "description": "Information Disclosure - Leakage, interception, or unauthorized access to sensitive or confidential data."
     },
     "Denial of Service": {
       "letter": "D",
-      "description": "Negação de serviço - Exaustão de recursos, bloqueio de serviços ou degradação de disponibilidade."
+      "description": "Denial of Service - Resource exhaustion, service disruption, or degradation of system availability."
     },
     "Elevation of Privilege": {
       "letter": "E",
-      "description": "Elevação de privilégios - Obtenção de acessos ou capacidades além dos privilégios atribuídos."
+      "description": "Elevation of Privilege - Gaining capabilities, access, or permissions beyond authorized levels."
     }
   },
   "stride_per_element": {
@@ -51,22 +51,37 @@
     ]
   },
   "dfd_properties": {
-    "is_encrypted": "Canal cifrado em trânsito (ex: TLS/HTTPS)",
-    "encrypted_at_rest": "Dados cifrados em repouso no armazenamento",
-    "sanitizes_input": "Sanitização e validação de parâmetros de entrada",
-    "checks_input_bounds": "Verificação estrita de limites e tamanhos de buffers",
-    "provides_authentication": "Mecanismo de autenticação implementado e exigido",
-    "authenticates_source": "Autenticação mútua da origem do fluxo de dados",
-    "validates_session_tokens": "Validação de integridade e rotação de tokens de sessão",
-    "enforces_authorization": "Controlo de acessos baseado em perfis (RBAC / ABAC)",
-    "runs_as_least_privilege": "Execução sob o princípio do menor privilégio",
-    "generates_audit_logs": "Geração de registos e logs de auditoria imutáveis",
-    "is_tamper_evident": "Proteção e integridade comprovada de registos/logs",
-    "has_rate_limiting": "Mecanismos de limitação de taxa (rate limiting) e throttling",
-    "defines_timeout": "Timeouts definidos para evitar esgotamento de conexões",
-    "enforces_quota_limits": "Limites de quota de disco e retenção de dados",
-    "masks_sensitive_data": "Ocultação e máscara de dados sensíveis em logs e saídas",
-    "restricts_command_execution": "Restrição de execução de comandos do sistema operativo"
+    "is_encrypted": "Encrypted communication channel in transit (e.g., TLS/HTTPS)",
+    "encrypted_at_rest": "Data encrypted at rest in persistent storage",
+    "sanitizes_input": "Sanitization and validation of untrusted input parameters",
+    "checks_input_bounds": "Strict verification of input buffer boundaries and payload sizes",
+    "provides_authentication": "Authentication mechanism implemented and enforced",
+    "authenticates_source": "Mutual authentication of the data flow origin",
+    "validates_session_tokens": "Integrity validation and rotation of session tokens",
+    "enforces_authorization": "Role- or attribute-based access control (RBAC / ABAC)",
+    "runs_as_least_privilege": "Execution under the principle of least privilege",
+    "generates_audit_logs": "Generation of immutable audit trails and security logs",
+    "is_tamper_evident": "Tamper-evident protection and verified integrity for logs",
+    "has_rate_limiting": "Rate limiting and request throttling mechanisms",
+    "defines_timeout": "Explicit connection and read/write timeouts configured",
+    "enforces_quota_limits": "Storage volume quotas and automated data retention policies",
+    "masks_sensitive_data": "Masking, tokenization, or redaction of sensitive data in logs and outputs",
+    "restricts_command_execution": "Restriction of arbitrary operating system command execution",
+    "enforces_access_control": "Strict access control lists (ACLs) and write permissions on storage",
+    "crosses_trust_boundary": "Data flow crosses an architectural trust boundary (e.g., Internet to internal)",
+    "masks_error_details": "Secure exception handling without leaking stack traces or internal runtime details",
+    "validates_resource_ownership": "Strict resource ownership validation on data access (BOLA/IDOR prevention)",
+    "validates_outgoing_urls": "Validation and restriction of outbound destination URLs (SSRF prevention)",
+    "manages_secrets_securely": "Use of dedicated secrets vaults without hardcoded or plaintext credentials",
+    "has_backup_and_replication": "Periodic automated backups and active multi-region replication",
+    "is_trusted_party": "External entity verified and belonging to a trusted domain",
+    "validates_redirect_targets": "Validation of destination URLs in HTTP redirects (Open Redirect prevention)",
+    "enforces_strict_cors": "Strict CORS policy enforcing origin whitelisting and credential restrictions",
+    "uses_safe_deserializers": "Exclusive use of safe serializers and parsers without arbitrary code execution",
+    "verifies_payload_signature": "Cryptographic signature validation on payloads and webhooks (e.g., HMAC)",
+    "filters_assignable_properties": "Strict filtering of assignable model attributes (Mass Assignment prevention)",
+    "sanitizes_file_paths": "Sanitization and canonical path resolution on filesystem access (Path Traversal prevention)",
+    "validates_file_types": "Strict validation of allowed extensions and magic bytes in file uploads"
   },
   "rules": [
     {
@@ -121,6 +136,59 @@
         "OWASP pytm CR01",
         "CWE-384",
         "CAPEC-61"
+      ]
+    },
+    {
+      "id": "STRIDE-S-04",
+      "category": "Spoofing",
+      "stride_letter": "S",
+      "applies_to": "external_entity",
+      "severity": "High",
+      "title": "Untrusted External Entity Impersonation",
+      "description": "External interactors operating outside the organization trust zone can forge identity or origin headers unless verified as a trusted party.",
+      "conditions": {
+        "is_trusted_party": false
+      },
+      "mitigation": "Authenticate external clients via mutual TLS, signed API keys, or identity provider verification, and establish trust boundaries.",
+      "references": [
+        "OWASP pytm AA01",
+        "CWE-290",
+        "CAPEC-115"
+      ]
+    },
+    {
+      "id": "STRIDE-S-05",
+      "category": "Spoofing",
+      "stride_letter": "S",
+      "applies_to": "process",
+      "severity": "Medium",
+      "title": "Unvalidated Redirection Target (Open Redirect)",
+      "description": "Process performs HTTP redirects using user-supplied parameters without validation, facilitating phishing and credential theft.",
+      "conditions": {
+        "validates_redirect_targets": false
+      },
+      "mitigation": "Maintain an explicit whitelist of allowed redirect URLs and validate targets strictly before initiating redirection.",
+      "references": [
+        "CWE-601",
+        "CAPEC-383"
+      ]
+    },
+    {
+      "id": "STRIDE-S-06",
+      "category": "Spoofing",
+      "stride_letter": "S",
+      "applies_to": "process",
+      "severity": "High",
+      "title": "Overly Permissive Cross-Origin Resource Sharing (CORS)",
+      "description": "Process configures wildcard origins or insecure CORS policies alongside credentials, allowing malicious external domains to impersonate authenticated browser clients.",
+      "conditions": {
+        "enforces_strict_cors": false
+      },
+      "mitigation": "Restrict allowed origins to an explicit trusted domain whitelist and disallow wildcard origins when credentials are supported.",
+      "references": [
+        "OWASP API8:2023",
+        "CWE-942",
+        "CAPEC-63"
       ]
     },
     {
@@ -198,6 +266,61 @@
       ]
     },
     {
+      "id": "STRIDE-T-05",
+      "category": "Tampering",
+      "stride_letter": "T",
+      "applies_to": "data_flow",
+      "severity": "Critical",
+      "title": "Insecure Trust Boundary Crossing without Transport Encryption",
+      "description": "Data traverses an architectural trust boundary over an unencrypted channel, exposing in-flight data to active packet manipulation and tampering.",
+      "conditions": {
+        "crosses_trust_boundary": true,
+        "is_encrypted": false
+      },
+      "mitigation": "Mandate TLS 1.3 encryption and message integrity verification (AEAD/HMAC) for all flows crossing trust boundaries.",
+      "references": [
+        "OWASP pytm CR01",
+        "CWE-319",
+        "CAPEC-94"
+      ]
+    },
+    {
+      "id": "STRIDE-T-06",
+      "category": "Tampering",
+      "stride_letter": "T",
+      "applies_to": "process",
+      "severity": "Critical",
+      "title": "Insecure Object Deserialization",
+      "description": "Process deserializes untrusted data using unsafe deserializers (such as pickle or unsafe YAML loaders), allowing adversaries to alter internal execution graphs and execute arbitrary code.",
+      "conditions": {
+        "uses_safe_deserializers": false
+      },
+      "mitigation": "Use safe data-only serialization formats (JSON, Protobuf) or strictly enforce safe loaders (e.g. yaml.safe_load) without arbitrary class instantiation.",
+      "references": [
+        "OWASP Top 10 A08:2021",
+        "CWE-502",
+        "CAPEC-586"
+      ]
+    },
+    {
+      "id": "STRIDE-T-07",
+      "category": "Tampering",
+      "stride_letter": "T",
+      "applies_to": "process",
+      "severity": "High",
+      "title": "Unverified Inbound Webhook Payload Ingestion",
+      "description": "Webhook ingestion endpoint processes incoming event notifications without validating cryptographic HMAC payload signatures, allowing payload forgery and tampering.",
+      "conditions": {
+        "verifies_payload_signature": false
+      },
+      "mitigation": "Verify HMAC signatures (e.g., Stripe-Signature, X-Hub-Signature) against shared secrets before processing webhook events.",
+      "references": [
+        "OWASP ASVS V13",
+        "CWE-345",
+        "CAPEC-220"
+      ]
+    },
+    {
       "id": "STRIDE-R-01",
       "category": "Repudiation",
       "stride_letter": "R",
@@ -230,6 +353,24 @@
       "references": [
         "CWE-779",
         "CAPEC-81"
+      ]
+    },
+    {
+      "id": "STRIDE-R-03",
+      "category": "Repudiation",
+      "stride_letter": "R",
+      "applies_to": "external_entity",
+      "severity": "High",
+      "title": "Unauthenticated Operations by External Entity",
+      "description": "External entity executes actions or sends data without mandatory authentication or signature, preventing non-repudiation and forensic tracing.",
+      "conditions": {
+        "provides_authentication": false
+      },
+      "mitigation": "Enforce client identity authentication, cryptographic request signatures, and audit timestamps at entry gateways.",
+      "references": [
+        "OWASP pytm AC03",
+        "CWE-778",
+        "CAPEC-93"
       ]
     },
     {
@@ -309,6 +450,79 @@
       ]
     },
     {
+      "id": "STRIDE-I-05",
+      "category": "Information Disclosure",
+      "stride_letter": "I",
+      "applies_to": "process",
+      "severity": "Medium",
+      "title": "Verbose Error Details and Stack Trace Disclosure",
+      "description": "Process does not mask internal runtime exceptions, exposing stack traces, framework versions, and database schemas in error responses.",
+      "conditions": {
+        "masks_error_details": false
+      },
+      "mitigation": "Implement centralized error-handling middleware that returns generic error messages to clients while logging stack traces internally.",
+      "references": [
+        "OWASP Top 10 A05:2021",
+        "CWE-209",
+        "CAPEC-215"
+      ]
+    },
+    {
+      "id": "STRIDE-I-06",
+      "category": "Information Disclosure",
+      "stride_letter": "I",
+      "applies_to": "process",
+      "severity": "Critical",
+      "title": "Insecure Secrets Management and Credential Exposure",
+      "description": "Secrets, database credentials, or private keys are not managed via dedicated secrets vaults, risking exposure via source code, logs, or environment dumping.",
+      "conditions": {
+        "manages_secrets_securely": false
+      },
+      "mitigation": "Use dedicated secrets managers (HashiCorp Vault, Azure Key Vault, AWS Secrets Manager) and avoid storing credentials in plain environment variables.",
+      "references": [
+        "OWASP pytm CR02",
+        "CWE-798",
+        "CAPEC-37"
+      ]
+    },
+    {
+      "id": "STRIDE-I-07",
+      "category": "Information Disclosure",
+      "stride_letter": "I",
+      "applies_to": "process",
+      "severity": "High",
+      "title": "Server-Side Request Forgery (SSRF) Vulnerability",
+      "description": "Process fetches remote resources based on user-supplied URLs without restricting target IP addresses, enabling internal cloud metadata probing.",
+      "conditions": {
+        "validates_outgoing_urls": false
+      },
+      "mitigation": "Validate and whitelist target URLs, disable HTTP redirects on outbound clients, and block private IP address ranges (RFC 1918, link-local 169.254.169.254).",
+      "references": [
+        "OWASP Top 10 A10:2021",
+        "OWASP API7:2023",
+        "CWE-918",
+        "CAPEC-664"
+      ]
+    },
+    {
+      "id": "STRIDE-I-08",
+      "category": "Information Disclosure",
+      "stride_letter": "I",
+      "applies_to": "process",
+      "severity": "High",
+      "title": "Path Traversal and Arbitrary File Disclosure",
+      "description": "Process resolves file system paths using untrusted user input without canonicalization, enabling directory traversal to read arbitrary system files or application code.",
+      "conditions": {
+        "sanitizes_file_paths": false
+      },
+      "mitigation": "Validate input against an allowlist, use canonical path resolution (e.g., Path.resolve()), and verify paths stay within authorized base directories.",
+      "references": [
+        "CWE-22",
+        "OWASP Top 10 A01:2021",
+        "CAPEC-126"
+      ]
+    },
+    {
       "id": "STRIDE-D-01",
       "category": "Denial of Service",
       "stride_letter": "D",
@@ -358,6 +572,23 @@
       "mitigation": "Set disk quotas, automated retention policies, and monitoring alerts for storage capacity.",
       "references": [
         "OWASP pytm DO03",
+        "CWE-400"
+      ]
+    },
+    {
+      "id": "STRIDE-D-04",
+      "category": "Denial of Service",
+      "stride_letter": "D",
+      "applies_to": "data_store",
+      "severity": "High",
+      "title": "Datastore Unavailability and Data Loss from Missing Backups",
+      "description": "Datastore lacks automated backups and multi-region replication, leading to permanent denial of service and data loss during hardware failure or ransomware.",
+      "conditions": {
+        "has_backup_and_replication": false
+      },
+      "mitigation": "Enable automated daily snapshots, point-in-time recovery (PITR), and cross-region replication for persistent data stores.",
+      "references": [
+        "OWASP pytm DS01",
         "CWE-400"
       ]
     },
@@ -413,6 +644,60 @@
         "OWASP pytm INP05",
         "CWE-78",
         "CAPEC-88"
+      ]
+    },
+    {
+      "id": "STRIDE-E-04",
+      "category": "Elevation of Privilege",
+      "stride_letter": "E",
+      "applies_to": "process",
+      "severity": "Critical",
+      "title": "Broken Object Level Authorization (BOLA / IDOR)",
+      "description": "Process does not validate that the authenticated user possesses ownership or access rights over the requested object ID, enabling privilege escalation across tenants.",
+      "conditions": {
+        "validates_resource_ownership": false
+      },
+      "mitigation": "Enforce resource-level authorization checks validating caller ownership before retrieving or mutating records by ID.",
+      "references": [
+        "OWASP API1:2023",
+        "CWE-639",
+        "CAPEC-122"
+      ]
+    },
+    {
+      "id": "STRIDE-E-05",
+      "category": "Elevation of Privilege",
+      "stride_letter": "E",
+      "applies_to": "process",
+      "severity": "High",
+      "title": "Mass Assignment via Unfiltered Object Properties",
+      "description": "Process binds client-supplied parameters directly to internal data models without property filtering, allowing attackers to escalate privileges by injecting unauthorized attributes.",
+      "conditions": {
+        "filters_assignable_properties": false
+      },
+      "mitigation": "Enforce strict Data Transfer Objects (DTOs) or Pydantic schemas that whitelist explicitly assignable fields for mutations.",
+      "references": [
+        "OWASP API3:2023",
+        "CWE-915",
+        "CAPEC-360"
+      ]
+    },
+    {
+      "id": "STRIDE-E-06",
+      "category": "Elevation of Privilege",
+      "stride_letter": "E",
+      "applies_to": "process",
+      "severity": "Critical",
+      "title": "Arbitrary File Upload and Execution Vulnerability",
+      "description": "Process accepts file uploads without verifying allowed file extensions or MIME magic numbers, enabling upload and execution of malicious server scripts.",
+      "conditions": {
+        "validates_file_types": false
+      },
+      "mitigation": "Validate file extensions and magic bytes against a strict whitelist, store files outside public web roots, and disable execution permissions.",
+      "references": [
+        "OWASP Top 10 A04:2021",
+        "CWE-434",
+        "CAPEC-650"
       ]
     }
   ]

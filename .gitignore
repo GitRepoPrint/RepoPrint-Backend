@@ -58,3 +58,7 @@ repos/
 
 # graphify
 graphify-out/
+
+/doc
+
+scripts/validate_ground_truth.py
