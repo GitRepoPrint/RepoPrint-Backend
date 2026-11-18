@@ -46,8 +46,9 @@ def test_credentials_are_never_allowed(monkeypatch):
     assert "access-control-allow-credentials" not in response.headers
 
 
-@pytest.mark.parametrize("path", ["/dfd", "/github/activity"])
-def test_errors_keep_the_cors_headers_so_the_page_can_show_them(monkeypatch, path):
+# /github/activity exige sessão, por isso responde 401 antes de olhar para o URL
+@pytest.mark.parametrize("path, status", [("/dfd", 400), ("/github/activity", 401)])
+def test_errors_keep_the_cors_headers_so_the_page_can_show_them(monkeypatch, path, status):
     response= client_for(monkeypatch, "https://app.test").get(path, params={"url": "not a url"}, headers={"Origin": "https://app.test"})
-    assert response.status_code == 400
+    assert response.status_code == status
     assert response.headers["access-control-allow-origin"] == "https://app.test"

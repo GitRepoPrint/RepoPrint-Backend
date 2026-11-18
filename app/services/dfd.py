@@ -2,6 +2,9 @@ import os
 import posixpath
 import re
 from collections import Counter, defaultdict
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
+from typing import Callable
 from urllib.parse import urlparse
 
 from app.services.code_fetcher import SourceFile
@@ -22,17 +25,68 @@ MAX_FLOWS= 500
 MAX_FLOW_RESOURCES= 30
 
 
-def parse_files(files: list[SourceFile]) -> tuple[list[ParsedFile], dict]:
+PROGRESS_STEPS= 20
+# Num repositório grande a análise de cada ficheiro (tree-sitter) reparte-se por vários processos: as threads não ajudam, porque o
+# Python só corre uma de cada vez. Abaixo disto não compensa o arranque dos processos.
+PARALLEL_MIN_FILES= 400
+PARALLEL_WORKERS= min(4, os.cpu_count() or 1)
+
+
+def _parse_chunk(items: list[tuple[str, str, bytes]]) -> list:
+    """Corre noutro processo: cada ficheiro dá um ParsedFile, ou o texto do erro (por exemplo, uma linguagem sem analisador)."""
+    out= []
+    for path, language, source in items:
+        try:
+            out.append(parse_file(path, language, source))
+        except Exception as e:
+            out.append(f"{type(e).__name__}: {e}")
+    return out
+
+
+def _parse_in_parallel(files: list[SourceFile], on_progress: Callable[[int, int], None] | None) -> list:
+    total= len(files)
+    size= max(20, -(-total // (PARALLEL_WORKERS * 6)))  # mais pedaços do que processos: equilibra o trabalho e dá avanço
+    chunks= [files[i:i + size] for i in range(0, total, size)]
+    results: list= []
+    with ProcessPoolExecutor(max_workers=PARALLEL_WORKERS) as pool:
+        futures= [pool.submit(_parse_chunk, [(f.path, f.language, f.source) for f in chunk]) for chunk in chunks]
+        for chunk, future in zip(chunks, futures):
+            results.extend(future.result())
+            if on_progress:
+                on_progress(len(results), total)
+    return results
+
+
+def parse_files(files: list[SourceFile], on_progress: Callable[[int, int], None] | None= None) -> tuple[list[ParsedFile], dict]:
+    """`on_progress(feitos, total)` é chamado umas vinte vezes ao longo do trabalho e no fim. O resultado vem sempre na ordem dos
+    ficheiros; uma linguagem sem analisador fica em `failed` e os seus restantes ficheiros saltam-se."""
     parsed: list[ParsedFile]= []
     failed: dict[str, str]= {}
-    for file in files:
-        if file.language in failed:
-            continue
+    total= len(files)
+
+    if total >= PARALLEL_MIN_FILES and PARALLEL_WORKERS > 1:
         try:
-            parsed.append(parse_file(file.path, file.language, file.source))
-        except Exception as e:
-            # linguagem sem parser disponível (por exemplo sem rede para o descarregar)
-            failed[file.language]= f"{type(e).__name__}: {e}"
+            for file, result in zip(files, _parse_in_parallel(files, on_progress)):
+                if file.language in failed:
+                    continue
+                if isinstance(result, str):
+                    failed[file.language]= result  # linguagem sem analisador disponível (por exemplo sem rede para o descarregar)
+                else:
+                    parsed.append(result)
+            return parsed, failed
+        except (OSError, BrokenProcessPool):
+            parsed, failed= [], {}  # sem processos (um ambiente limitado): faz-se aqui mesmo, como antes
+
+    step= max(1, total // PROGRESS_STEPS)
+    for done, file in enumerate(files, 1):
+        if file.language not in failed:
+            try:
+                parsed.append(parse_file(file.path, file.language, file.source))
+            except Exception as e:
+                # linguagem sem parser disponível (por exemplo sem rede para o descarregar)
+                failed[file.language]= f"{type(e).__name__}: {e}"
+        if on_progress and (done % step == 0 or done == total):
+            on_progress(done, total)
     return parsed, failed
 
 
