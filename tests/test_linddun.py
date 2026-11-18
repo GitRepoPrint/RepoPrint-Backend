@@ -248,3 +248,14 @@ def test_get_linddun_with_cached_dfd(client):
     assert data["repository"] == "test-org/test-repo"
     assert "summary" in data
     assert "findings" in data
+    assert len(data["summary"]["by_category"]) == 7
+
+
+def test_get_linddun_catalog(client):
+    response = client.get("/linddun/catalog")
+    assert response.status_code == 200
+    catalog = response.json()
+    assert "categories" in catalog
+    assert "rules" in catalog
+    assert len(catalog["categories"]) == 7
+    assert len(catalog["rules"]) >= 30

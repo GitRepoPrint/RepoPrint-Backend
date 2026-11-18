@@ -65,13 +65,19 @@ class LinddunEngine:
                     findings.append(self._create_finding(rule, flow, is_flow=True))
 
         # 3. Estatísticas sumárias
-        cat_counts = Counter(f.category for f in findings)
-        sev_counts = Counter(f.severity for f in findings)
+        # Inicializar todas as categorias LINDDUN e severidades para consumo direto na UI (ex: gráficos radar/barras)
+        by_category = {cat: 0 for cat in self.categories.values()}
+        for f in findings:
+            by_category[f.category] = by_category.get(f.category, 0) + 1
+
+        by_severity = {sev: 0 for sev in ["Critical", "High", "Medium", "Low", "Info"]}
+        for f in findings:
+            by_severity[f.severity] = by_severity.get(f.severity, 0) + 1
 
         summary = LinddunSummary(
             total_findings=len(findings),
-            by_category=dict(cat_counts),
-            by_severity=dict(sev_counts),
+            by_category=by_category,
+            by_severity=by_severity,
         )
 
         repo_name = normalized_dfd.get("repository", "unknown")

@@ -4,10 +4,11 @@ from typing import Any, Dict, Literal, Union
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from app.routers.dfd import _analyse_repository
+from app.routers.dfd import _admit, _analyse_repository, _failure
 from app.schemas.dfd import DfdGraph
 from app.schemas.linddun import LinddunReport
-from app.services.github import GitHubError, parse_repo_url
+from app.services.github import GitHubError
+from app.services.linddun_catalog import load_catalog
 from app.services.linddun_engine import LinddunEngine
 
 router = APIRouter(prefix="/linddun", tags=["linddun"])
@@ -20,50 +21,23 @@ async def analyze_repository_privacy(
     group_by: Literal["directory", "file"] = Query("directory", description="Granularidade dos processos"),
 ):
     """Gera o DFD do repositório GitHub e corre a análise de ameaças LINDDUN."""
-    guard = request.app.state.guard
-    try:
-        owner, repo = parse_repo_url(url)
-    except GitHubError as e:
-        raise HTTPException(status_code=e.status, detail=e.message)
-
-    key = (owner.lower(), repo.lower(), group_by)
-    cached_dfd = guard.cache.get(key)
+    admission = await _admit(request, url, group_by)
     engine = LinddunEngine()
 
     # Se o DFD já estiver em cache, reaproveita diretamente sem novo download
-    if cached_dfd is not None:
-        return engine.analyze(cached_dfd)
-
-    wait = guard.limiter.check(
-        guard.client_id(
-            request.client.host if request.client else None,
-            request.headers.get("x-forwarded-for"),
-        )
-    )
-    if wait > 0:
-        raise HTTPException(
-            status_code=429,
-            detail="Demasiados pedidos: tente mais tarde",
-            headers={"Retry-After": str(int(wait) + 1)},
-        )
-
-    if not await guard.acquire_slot():
-        raise HTTPException(
-            status_code=503,
-            detail="Servidor ocupado: tente mais tarde",
-            headers={"Retry-After": "10"},
-        )
+    if admission.cached is not None:
+        return engine.analyze(admission.cached)
 
     try:
-        dfd_graph = await _analyse_repository(owner, repo, group_by)
-        guard.cache.set(key, dfd_graph)
+        dfd_graph = await _analyse_repository(admission.owner, admission.repo, group_by)
+        request.app.state.guard.cache.set(admission.key, dfd_graph)
         return engine.analyze(dfd_graph)
-    except GitHubError as e:
-        raise HTTPException(status_code=e.status, detail=e.message)
-    except httpx.HTTPError:
-        raise HTTPException(status_code=502, detail="Falha ao contactar o GitHub")
+    except (GitHubError, httpx.HTTPError) as error:
+        status, detail = _failure(error)
+        raise HTTPException(status_code=status, detail=detail)
     finally:
-        guard.slots.release()
+        if admission.lease:
+            admission.lease.release()
 
 
 @router.post("/analyze", response_model=LinddunReport)
@@ -71,3 +45,9 @@ async def analyze_custom_dfd(dfd: Union[DfdGraph, Dict[str, Any]]):
     """Analisa diretamente um grafo DFD fornecido no corpo do pedido (JSON)."""
     engine = LinddunEngine()
     return engine.analyze(dfd)
+
+
+@router.get("/catalog")
+async def get_linddun_catalog():
+    """Retorna o catálogo completo de categorias, regras e propriedades LINDDUN."""
+    return load_catalog()
