@@ -2,7 +2,8 @@
 
 Analyzes Data Flow Diagrams (DFDs) in JSON format and identifies threats
 based on declarative rules adapted from OWASP pytm and the STRIDE methodology.
-Operates on a strictly defensive security model (assumes absence of controls in case of doubt).
+Operates on a refined, context-aware defensive security model that avoids false positives
+on in-process code imports, test suites, and template presentations.
 """
 
 from __future__ import annotations
@@ -16,7 +17,11 @@ from typing import Any
 class StrideEngine:
     """Evaluation engine for STRIDE threats against DFD representations."""
 
-    def __init__(self, catalog_path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        catalog_path: str | Path | None = None,
+        filter_auxiliary_components: bool = True,
+    ) -> None:
         if catalog_path is None:
             catalog_path = Path(__file__).parent / "stride_catalog.json"
         else:
@@ -29,15 +34,20 @@ class StrideEngine:
         self.stride_per_element: dict[str, list[str]] = catalog.get("stride_per_element", {})
         self.dfd_properties: dict[str, str] = catalog.get("dfd_properties", {})
         self.rules: list[dict[str, Any]] = catalog.get("rules", [])
+        self.filter_auxiliary_components = filter_auxiliary_components
 
     def analyze(self, dfd: dict[str, Any]) -> dict[str, Any]:
         """Analyze a DFD JSON structure and return detected STRIDE threats."""
         findings: list[dict[str, Any]] = []
 
         elements, data_flows = self._normalize_dfd(dfd)
+        context = self._build_graph_context(elements, data_flows)
 
         # 1. Evaluate element rules (process, data_store, external_entity)
         for elem in elements:
+            if self.filter_auxiliary_components and self._is_auxiliary_or_test(elem):
+                continue
+
             elem_type = elem.get("type")
             elem_props = self._extract_properties(elem)
 
@@ -45,15 +55,24 @@ class StrideEngine:
                 if rule.get("applies_to") != elem_type:
                     continue
 
+                if not self._is_rule_applicable_to_element(rule, elem, elem_props, context):
+                    continue
+
                 if self._matches_conditions(rule.get("conditions", {}), elem_props):
                     findings.append(self._create_finding(rule, elem, is_flow=False))
 
         # 2. Evaluate flow rules (data_flow)
         for flow in data_flows:
+            if self.filter_auxiliary_components and self._is_flow_connected_to_auxiliary(flow, context):
+                continue
+
             flow_props = self._extract_properties(flow)
 
             for rule in self.rules:
                 if rule.get("applies_to") != "data_flow":
+                    continue
+
+                if not self._is_rule_applicable_to_flow(rule, flow, flow_props, context):
                     continue
 
                 if self._matches_conditions(rule.get("conditions", {}), flow_props):
@@ -77,14 +96,224 @@ class StrideEngine:
             if comp_id and cat and cat not in stride_matrix[comp_id]:
                 stride_matrix[comp_id].append(cat)
 
+        repo = dfd.get("repository", "unknown")
+        if isinstance(repo, dict):
+            repo_name = f"{repo.get('owner', '')}/{repo.get('repo', '')}" if repo.get("owner") else repo.get("repo", "unknown")
+        else:
+            repo_name = str(repo)
+
         return {
-            "repository": dfd.get("repository", "unknown"),
+            "repository": repo_name,
             "total_findings": len(findings),
             "summary_by_category": summary_by_category,
             "summary_by_severity": summary_by_severity,
             "stride_matrix": dict(stride_matrix),
             "findings": findings,
         }
+
+    def _build_graph_context(
+        self, elements: list[dict[str, Any]], data_flows: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Index the graph for contextual topological checks."""
+        elem_by_id = {e.get("id"): e for e in elements if e.get("id")}
+        inbound: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        outbound: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
+        for f in data_flows:
+            src = f.get("source")
+            tgt = f.get("target")
+            if src:
+                outbound[src].append(f)
+            if tgt:
+                inbound[tgt].append(f)
+
+        return {
+            "elem_by_id": elem_by_id,
+            "inbound": inbound,
+            "outbound": outbound,
+        }
+
+    def _is_auxiliary_or_test(self, comp: dict[str, Any]) -> bool:
+        """Identify test suites, dev environments, or auxiliary tooling."""
+        path = str(comp.get("path") or comp.get("file_path") or "").lower()
+        cid = str(comp.get("id") or "").lower()
+        name = str(comp.get("name") or "").lower()
+
+        # If it's a pure architectural ID without path (e.g. proc_1, proc_auth), keep it
+        if not path:
+            return cid.startswith("test_") or name.startswith("test ")
+
+        parts = [p.strip() for p in path.split("/") if p.strip()]
+        test_indicators = {"tests", "__tests__", "test_apps", "type_check", ".devcontainer", "fixtures", "mock", "mocks"}
+        return any(part in test_indicators for part in parts)
+
+    def _is_flow_connected_to_auxiliary(self, flow: dict[str, Any], context: dict[str, Any]) -> bool:
+        """Check if a data flow is exclusively tied to an auxiliary/test component."""
+        src_id = flow.get("source")
+        tgt_id = flow.get("target")
+        src = context["elem_by_id"].get(src_id)
+        tgt = context["elem_by_id"].get(tgt_id)
+        if src and self._is_auxiliary_or_test(src):
+            return True
+        if tgt and self._is_auxiliary_or_test(tgt):
+            return True
+        return False
+
+    def _is_rule_applicable_to_element(
+        self,
+        rule: dict[str, Any],
+        elem: dict[str, Any],
+        elem_props: dict[str, Any],
+        context: dict[str, Any],
+    ) -> bool:
+        """Filter rules based on the element's actual role and attack surface."""
+        rid = rule.get("id", "")
+        conditions = rule.get("conditions", {})
+
+        # 1. If any condition property is explicitly defined as a boolean/value, always evaluate
+        has_explicit_prop = any(
+            k in elem_props and elem_props[k] is not None
+            for k in conditions.keys()
+            if k not in ("protocol", "trust_zone")
+        )
+        if has_explicit_prop:
+            return True
+
+        # 2. Template directories (HTML views without backend API routes)
+        path = str(elem.get("path") or elem.get("file_path") or "").lower()
+        parts = [p.strip() for p in path.split("/") if p.strip()]
+        is_template = "templates" in parts or "html" in elem_props
+        extra = elem.get("extra", {}) if isinstance(elem.get("extra"), dict) else {}
+        routes = extra.get("routes", [])
+        route_count = extra.get("route_count", len(routes))
+
+        if is_template and route_count == 0:
+            return False
+
+        # 3. Determine if this process exposes a Web / API surface
+        inbound = context["inbound"].get(elem.get("id"), [])
+        receives_external_traffic = any(
+            str(f.get("source", "")).startswith("external_entity")
+            or "http" in str(f.get("label", "")).lower()
+            or "form" in str(f.get("label", "")).lower()
+            for f in inbound
+        )
+
+        has_api_surface = (
+            route_count > 0
+            or receives_external_traffic
+            or "api" in str(elem.get("id", "")).lower()
+            or "api" in str(elem.get("name", "")).lower()
+            or "gateway" in str(elem.get("name", "")).lower()
+            or ("files" not in extra and not path)  # Architectural DFD without AST files
+        )
+
+        # Web API-specific rules
+        web_api_rules = {
+            "STRIDE-S-01",  # Unauthenticated API Endpoint
+            "STRIDE-S-03",  # Weak or Unvalidated Session Identifiers
+            "STRIDE-S-05",  # Open Redirect
+            "STRIDE-S-06",  # Permissive CORS
+            "STRIDE-D-01",  # Missing Rate Limiting
+            "STRIDE-E-04",  # BOLA / IDOR
+            "STRIDE-E-05",  # Mass Assignment (BOPLA)
+        }
+        if rid in web_api_rules and not has_api_surface:
+            return False
+
+        # Webhook specific rule (STRIDE-T-07)
+        if rid == "STRIDE-T-07":
+            is_webhook = (
+                "webhook" in str(elem.get("id", "")).lower()
+                or "webhook" in str(elem.get("name", "")).lower()
+                or "webhook" in path
+                or any("webhook" in str(r.get("path", "")).lower() for r in routes)
+                or ("files" not in extra and not path)
+            )
+            if not is_webhook:
+                return False
+
+        # Arbitrary file upload rule (STRIDE-E-06)
+        if rid == "STRIDE-E-06":
+            is_upload = (
+                "upload" in str(elem.get("id", "")).lower()
+                or "upload" in str(elem.get("name", "")).lower()
+                or "upload" in path
+                or any("upload" in str(r.get("path", "")).lower() for r in routes)
+                or ("files" not in extra and not path)
+            )
+            if not is_upload:
+                return False
+
+        # Insecure deserialization rule (STRIDE-T-06)
+        if rid == "STRIDE-T-06":
+            tech = str(elem.get("technology") or "").lower()
+            tags = [str(t).lower() for t in elem.get("tags", [])]
+            via: list[str] = []
+            for f in inbound:
+                via_list = f.get("extra", {}).get("via", []) if isinstance(f.get("extra"), dict) else []
+                via.extend([str(v).lower() for v in via_list])
+            uses_serialization = (
+                any(k in tech for k in ["celery", "redis", "pickle", "yaml", "serialize", "queue", "kafka", "rabbit"])
+                or any(k in tags for k in ["queue", "celery", "worker", "serialization"])
+                or any(k in str(via) for k in ["celery", "pickle", "yaml", "serialize"])
+                or ("files" not in extra and not path)
+            )
+            if not uses_serialization:
+                return False
+
+        return True
+
+    def _is_rule_applicable_to_flow(
+        self,
+        rule: dict[str, Any],
+        flow: dict[str, Any],
+        flow_props: dict[str, Any],
+        context: dict[str, Any],
+    ) -> bool:
+        """Filter network flow rules so that in-memory code imports are not falsely flagged."""
+        rid = rule.get("id", "")
+        conditions = rule.get("conditions", {})
+
+        # If a property is explicitly declared with a boolean, always evaluate
+        has_explicit_prop = any(
+            k in flow_props and flow_props[k] is not None
+            for k in conditions.keys()
+            if k not in ("protocol", "trust_zone")
+        )
+        if has_explicit_prop:
+            return True
+
+        label = str(flow.get("label") or flow.get("name") or "").lower()
+        src_id = str(flow.get("source", ""))
+        tgt_id = str(flow.get("target", ""))
+        protocol = flow.get("protocol")
+
+        is_network = (
+            protocol is not None
+            or flow.get("is_network") is True
+            or flow.get("crosses_trust_boundary") is True
+            or src_id.startswith("external_entity")
+            or tgt_id.startswith("external_entity")
+            or src_id.startswith("data_store")
+            or tgt_id.startswith("data_store")
+            or any(kw in label for kw in ["http", "form", "publishes", "consumes", "socket", "api", "rpc", "remote"])
+            or (not label and not src_id.startswith("process:") and not tgt_id.startswith("process:"))
+        )
+
+        network_rules = {
+            "STRIDE-S-02",  # Missing Mutual Authentication on Data Flow
+            "STRIDE-T-01",  # Unencrypted Dataflow in Transit
+            "STRIDE-T-05",  # Insecure Trust Boundary Crossing without Transport Encryption
+            "STRIDE-I-01",  # Cleartext Sensitive Data in Transit
+            "STRIDE-I-03",  # Insecure Protocol Usage
+            "STRIDE-D-02",  # Missing Connection Timeout Configuration
+        }
+
+        if rid in network_rules and not is_network:
+            return False
+
+        return True
 
     def _normalize_dfd(self, dfd: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Normalize DFD representation whether in input.json format or DfdGraph schema format."""
@@ -209,4 +438,4 @@ if __name__ == "__main__":
         result = engine.analyze(target_dfd)
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:
-        print("Usage: python stride_engine.py <dfd_json_file>")
+        print("Usage: python defensive_stride_engine.py <dfd_json_file>")

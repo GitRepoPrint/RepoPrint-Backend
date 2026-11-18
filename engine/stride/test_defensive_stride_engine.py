@@ -730,3 +730,76 @@ def test_mass_assignment_bopla_discrimination():
     assert "STRIDE-E-05" not in filtered_threats
 
 
+def test_in_process_import_flows_do_not_trigger_network_tampering():
+    """Verify that in-memory code imports between modules do not trigger network TLS or mTLS threats."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/in-process-imports",
+        "nodes": [
+            {"id": "process:mod_a", "kind": "process", "name": "Module A", "path": "src/mod_a.py"},
+            {"id": "process:mod_b", "kind": "process", "name": "Module B", "path": "src/mod_b.py"},
+        ],
+        "edges": [
+            {
+                "id": "edge_import",
+                "source": "process:mod_a",
+                "target": "process:mod_b",
+                "label": "imports",
+            }
+        ],
+    }
+    result = engine.analyze(dfd)
+    findings = result["findings"]
+    edge_threats = [f["threat_id"] for f in findings if f.get("component_id") == "edge_import"]
+    # Internal code import should NOT trigger in-transit encryption or mTLS threats
+    assert "STRIDE-T-01" not in edge_threats
+    assert "STRIDE-S-02" not in edge_threats
+    assert "STRIDE-I-01" not in edge_threats
+    assert len(edge_threats) == 0
+
+
+def test_auxiliary_test_components_filtered_by_default():
+    """Verify that test harnesses and dev containers are excluded from production threat findings."""
+    engine = StrideEngine(filter_auxiliary_components=True)
+    dfd = {
+        "repository": "test/test-harness",
+        "nodes": [
+            {"id": "process:tests/test_api", "kind": "process", "name": "Test Suite", "path": "tests/test_api.py"},
+            {"id": "process:src/api", "kind": "process", "name": "Prod API", "path": "src/api.py", "extra": {"route_count": 2}},
+        ],
+        "edges": [],
+    }
+    result = engine.analyze(dfd)
+    matrix = result["stride_matrix"]
+    assert "process:tests/test_api" not in matrix
+    assert "process:src/api" in matrix
+
+
+def test_internal_library_without_routes_does_not_trigger_api_endpoint_threats():
+    """Verify that internal modules without routes do not trigger web API threats like CORS or BOLA."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/library-module",
+        "nodes": [
+            {
+                "id": "process:src/utils",
+                "kind": "process",
+                "name": "Utils",
+                "path": "src/utils.py",
+                "extra": {"files": ["src/utils.py"], "route_count": 0, "routes": []},
+            }
+        ],
+        "edges": [],
+    }
+    result = engine.analyze(dfd)
+    findings = result["findings"]
+    threat_ids = [f["threat_id"] for f in findings if f["component_id"] == "process:src/utils"]
+    # Web API threats should NOT fire on internal library
+    assert "STRIDE-S-01" not in threat_ids  # Unauthenticated API endpoint
+    assert "STRIDE-S-06" not in threat_ids  # Permissive CORS
+    assert "STRIDE-E-04" not in threat_ids  # BOLA / IDOR
+    # General code-level threats (e.g. input bounds, input sanitization) still fire defensively
+    assert "STRIDE-T-02" in threat_ids
+
+
+
