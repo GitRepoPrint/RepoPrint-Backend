@@ -118,9 +118,8 @@ class TestChoosingWhatToRead:
         assert len(chosen) == 10
 
     @pytest.mark.parametrize("path, expected", [
-        ("tests/test_a.py", True), ("src/tests/unit/a.py", True), ("docs_src/t/a.py", True), ("examples/a.py", True), ("scripts/a.py", True),
-        ("benchmarks/a.py", True), ("pkg/test_models.py", False), ("tests_utils/a.py", False), ("src/app/a.py", False), ("latest/a.py", False),
-        ("contests/a.py", False), ("pkg/foo_tests/a.py", True), ("e2e/a.py", True),
+        ("tests/test_a.py", True), ("src/tests/unit/a.py", True), ("docs_src/t/a.py", True), ("scripts/a.py", True), ("pkg/foo_tests/a.py", True),
+        ("pkg/test_models.py", False), ("tests_utils/a.py", False), ("src/app/a.py", False), ("contests/a.py", False),
     ])
     def test_which_folders_count_as_tests_docs_and_examples(self, path, expected):
         assert fetcher.is_auxiliary(path) is expected

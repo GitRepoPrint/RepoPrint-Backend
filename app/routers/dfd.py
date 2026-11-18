@@ -109,6 +109,11 @@ async def get_dfd(
         admission.lease.release()
 
 
+def _result_event(result: dict) -> dict:
+    """O resultado como o GET /dfd o devolve: passa pelo mesmo modelo, que acrescenta os campos vazios (`file`, `line`, `span`)."""
+    return {"type": "result", "graph": DfdGraph.model_validate(result).model_dump(mode="json")}
+
+
 def _line(event: dict) -> str:
     return json.dumps(event, default=str, separators=(",", ":")) + "\n"
 
@@ -131,7 +136,7 @@ async def stream_dfd(
 
     if admission.cached is not None:
         async def cached():
-            yield _line({"type": "result", "graph": admission.cached})
+            yield _line(_result_event(admission.cached))
 
         return StreamingResponse(cached(), media_type="application/x-ndjson")
 
@@ -152,7 +157,7 @@ async def stream_dfd(
             try:
                 result= await _analyse_repository(admission.owner, admission.repo, group_by, progress)
                 guard.cache.set(admission.key, result)
-                final.append({"type": "result", "graph": result})
+                final.append(_result_event(result))
             except (GitHubError, httpx.HTTPError) as error:
                 status, detail= _failure(error)
                 final.append({"type": "error", "status": status, "detail": detail})

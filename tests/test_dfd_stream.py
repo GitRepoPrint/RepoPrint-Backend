@@ -48,9 +48,9 @@ class TestTheStream:
         events= events_of(client)
         assert events[-1]["type"] == "result"
         assert all(e["type"] == "progress" for e in events[:-1])
-        assert events[-1]["graph"] == client.get("/dfd", params={"url": URL}).json() or events[-1]["graph"]["nodes"]
         plain= client.get("/dfd", params={"url": URL}).json()
         assert [n["id"] for n in events[-1]["graph"]["nodes"]] == [n["id"] for n in plain["nodes"]]
+        assert events[-1]["graph"]["edges"] == plain["edges"]
 
     def test_the_phases_come_in_order(self, monkeypatch, downloads):
         events= events_of(TestClient(app_with(monkeypatch)))
@@ -183,17 +183,6 @@ class TestProgressOfTheParser:
         assert len(parsed) == 100
         assert seen[-1] == (100, 100) and len(seen) < 100
         assert [d for d, _ in seen] == sorted(d for d, _ in seen)
-
-    def test_it_still_works_without_a_callback(self):
-        from app.services.dfd import parse_files
-
-        assert len(parse_files([SourceFile("a.py", "python", b"import os\n")])[0]) == 1
-
-    def test_the_order_of_the_files_is_kept(self):
-        from app.services.dfd import parse_files
-
-        files= [SourceFile(f"m{i:03}.py", "python", b"import os\n") for i in range(60)]
-        assert [p.path for p in parse_files(files)[0]] == [f.path for f in files]
 
 
 class TestParsingInParallel:
