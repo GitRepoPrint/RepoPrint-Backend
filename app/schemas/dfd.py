@@ -72,6 +72,13 @@ class DfdStats(BaseModel):
     flows: int
     languages: dict[str, int]
     unsupported_languages: dict[str, str]
+    #: ficheiros de código que o repositório tem (se são mais do que os lidos, `sampled` é verdadeiro)
+    files_found: int | None= None
+    sampled: bool= False
+    #: a listagem de ficheiros ficou incompleta (uma pasta grande demais até para a API do GitHub)
+    listing_truncated: bool= False
+    #: "graphql", "tree" (um pedido por ficheiro) ou "archive" (arquivo inteiro)
+    fetch_method: str | None= None
 
 
 class RepositoryRef(BaseModel):

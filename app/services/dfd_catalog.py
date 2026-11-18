@@ -5,6 +5,7 @@
 # Os dados vivem em dfd_catalog.json, partilhado com o overview do frontend (ver docs/dfd-schema.md).
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 DATASTORE= "datastore"
@@ -32,7 +33,9 @@ def _load():
 _load()
 
 
+@lru_cache(maxsize=65536)
 def classify(module: str) -> tuple[str, str] | None:
+    # os mesmos módulos repetem-se milhares de vezes num repositório (e cada pesquisa percorre o catálogo todo): guarda-se o resultado
     lowered= module.lower()
     for key, value in CATALOG.items():
         if lowered == key or (lowered.startswith(key) and lowered[len(key)] in "./:\\"):

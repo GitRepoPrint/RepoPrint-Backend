@@ -80,6 +80,26 @@ class RateLimiter:
             del self._hits[next(iter(self._hits))]
 
 
+class Lease:
+    """Uma vaga ocupada. Devolve-se uma só vez, aconteça o que acontecer: ao acabar, se o cliente desligar, ou, se nada disso for
+    notado (um pedido em fluxo que nunca chegou a começar), passado `max_seconds`."""
+
+    def __init__(self, slots: asyncio.Semaphore, max_seconds: float):
+        self._slots= slots
+        self._released= False
+        self._timer= asyncio.get_running_loop().call_later(max_seconds, self.release)
+
+    def release(self) -> None:
+        if self._released:
+            return
+        self._released= True
+        self._timer.cancel()
+        self._slots.release()
+
+
+LEASE_MAX_SECONDS= 300
+
+
 @dataclass
 class DfdGuard:
     cache: TtlCache
@@ -105,6 +125,12 @@ class DfdGuard:
             if first:
                 return first
         return host or "unknown"
+
+    async def lease(self) -> Lease | None:
+        """Uma vaga que se devolve com `release()`, ou None se não houve nenhuma a tempo."""
+        if not await self.acquire_slot():
+            return None
+        return Lease(self.slots, LEASE_MAX_SECONDS)
 
     async def acquire_slot(self) -> bool:
         """True se conseguiu uma vaga a tempo."""
