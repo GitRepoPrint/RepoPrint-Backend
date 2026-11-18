@@ -12,10 +12,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-COPY main.py ./
+COPY main.py alembic.ini ./
 COPY app ./app
+COPY alembic ./alembic
 
-RUN useradd --system --no-create-home repoprint
+RUN useradd --system --create-home repoprint
 USER repoprint
 
 EXPOSE 8000
