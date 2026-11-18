@@ -1,0 +1,55 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: repoprint
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: repoprint_test
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U repoprint"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: repoprint_test
+      DB_USER: repoprint
+      DB_PASSWORD: ci-password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+        
+      - run: uv python install 3.14
+      - run: uv sync --frozen --python 3.14
+
+      - run: uvx ruff@0.17.5 check . --select E9,F63,F7,F82
+
+      - run: uv run python -c "import main"
+
+      - run: uv run pytest -rs
