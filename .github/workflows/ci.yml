@@ -27,9 +27,9 @@ jobs:
 
         options: >-
           --health-cmd "pg_isready -U repoprint"
-          --health-intevrval 5s
-          --helath-timeout 5s
-          --health-retries 10s
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     env:
       DB_HOST: localhost
