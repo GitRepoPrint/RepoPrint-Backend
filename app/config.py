@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     dfd_rate_window_seconds: int= 60
     dfd_cache_ttl_seconds: int= 600         # 0 desliga a cache
     dfd_cache_max_entries: int= 32
+    dfd_fetch_method: str= "auto"           # "auto": lista os ficheiros pela API e pede só o código ao raw; se falhar, descarrega o arquivo. "archive": só o arquivo
+    dfd_fetch_concurrency: int= 48          # pedidos ao raw.githubusercontent.com ao mesmo tempo
+    github_raw_url: str= "https://raw.githubusercontent.com"
     trust_forwarded_for: bool= False        # atrás de um proxy: usar o X-Forwarded-For como endereço do cliente
     db_host: str= "localhost"
     db_port: int= 5432
@@ -38,6 +41,7 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip().rstrip("/") for origin in self.cors_origins.split(",") if origin.strip()]
+    @property
     def realm_url(self) -> str:
         return self.keycloak_url or self.keycloak_issuer
 
