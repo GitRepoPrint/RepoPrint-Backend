@@ -1,24 +1,23 @@
 {
   "repository": "pallets/flask",
-  "total_findings": 176,
+  "total_findings": 156,
   "summary_by_category": {
-    "Spoofing": 31,
+    "Spoofing": 23,
     "Tampering": 32,
-    "Repudiation": 15,
+    "Repudiation": 11,
     "Information Disclosure": 48,
-    "Denial of Service": 23,
-    "Elevation of Privilege": 27
+    "Denial of Service": 19,
+    "Elevation of Privilege": 23
   },
   "summary_by_severity": {
-    "Critical": 28,
-    "High": 108,
-    "Medium": 40,
+    "Critical": 23,
+    "High": 99,
+    "Medium": 34,
     "Low": 0
   },
   "stride_matrix": {
     "process:examples/celery": [
       "Tampering",
-      "Repudiation",
       "Information Disclosure",
       "Elevation of Privilege"
     ],
@@ -48,19 +47,16 @@
     ],
     "process:src/flask": [
       "Tampering",
-      "Repudiation",
       "Information Disclosure",
       "Elevation of Privilege"
     ],
     "process:src/flask/json": [
       "Tampering",
-      "Repudiation",
       "Information Disclosure",
       "Elevation of Privilege"
     ],
     "process:src/flask/sansio": [
       "Tampering",
-      "Repudiation",
       "Information Disclosure",
       "Elevation of Privilege"
     ],
@@ -85,8 +81,7 @@
     "data_store:sqlite": [
       "Tampering",
       "Repudiation",
-      "Information Disclosure",
-      "Denial of Service"
+      "Information Disclosure"
     ],
     "external_entity:http-api": [
       "Spoofing",
@@ -99,8 +94,7 @@
     "data_store:file-storage": [
       "Tampering",
       "Repudiation",
-      "Information Disclosure",
-      "Denial of Service"
+      "Information Disclosure"
     ],
     "process:examples/celery/src/task_app->data_store:message-queue:publishes/consumes": [
       "Spoofing",
@@ -109,25 +103,21 @@
       "Denial of Service"
     ],
     "external_entity:client->process:examples/celery/src/task_app:HTTP requests": [
-      "Spoofing",
       "Tampering",
       "Information Disclosure",
       "Denial of Service"
     ],
     "external_entity:client->process:examples/celery/src/task_app/templates:submits form": [
-      "Spoofing",
       "Tampering",
       "Information Disclosure",
       "Denial of Service"
     ],
     "external_entity:client->process:examples/javascript/js_example:HTTP requests": [
-      "Spoofing",
       "Tampering",
       "Information Disclosure",
       "Denial of Service"
     ],
     "external_entity:client->process:examples/javascript/js_example/templates:submits form": [
-      "Spoofing",
       "Tampering",
       "Information Disclosure",
       "Denial of Service"
@@ -145,7 +135,6 @@
       "Denial of Service"
     ],
     "external_entity:client->process:examples/tutorial/flaskr:HTTP requests": [
-      "Spoofing",
       "Tampering",
       "Information Disclosure",
       "Denial of Service"
@@ -157,13 +146,11 @@
       "Denial of Service"
     ],
     "external_entity:client->process:examples/tutorial/flaskr/templates/auth:submits form": [
-      "Spoofing",
       "Tampering",
       "Information Disclosure",
       "Denial of Service"
     ],
     "external_entity:client->process:examples/tutorial/flaskr/templates/blog:submits form": [
-      "Spoofing",
       "Tampering",
       "Information Disclosure",
       "Denial of Service"
@@ -245,24 +232,6 @@
       "file_path": "examples/celery"
     },
     {
-      "threat_id": "STRIDE-R-01",
-      "category": "Repudiation",
-      "stride_letter": "R",
-      "severity": "Medium",
-      "target_type": "process",
-      "component_id": "process:examples/celery",
-      "component_name": "celery",
-      "title": "Missing Security Audit Logging",
-      "description": "Critical business transactions and security state transitions occur without generating audit trails, allowing actors to repudiate actions.",
-      "mitigation": "Implement non-repudiable audit logging for sensitive operations including identity, timestamp, action, and outcome.",
-      "references": [
-        "OWASP pytm AC03",
-        "CWE-778",
-        "CAPEC-93"
-      ],
-      "file_path": "examples/celery"
-    },
-    {
       "threat_id": "STRIDE-I-05",
       "category": "Information Disclosure",
       "stride_letter": "I",
@@ -332,24 +301,6 @@
         "CWE-22",
         "OWASP Top 10 A01:2021",
         "CAPEC-126"
-      ],
-      "file_path": "examples/celery"
-    },
-    {
-      "threat_id": "STRIDE-E-01",
-      "category": "Elevation of Privilege",
-      "stride_letter": "E",
-      "severity": "Critical",
-      "target_type": "process",
-      "component_id": "process:examples/celery",
-      "component_name": "celery",
-      "title": "Missing Principle of Least Privilege (PoLP)",
-      "description": "Process executes with elevated operating system or cluster privileges, allowing an attacker who breaches it to compromise the entire host.",
-      "mitigation": "Run processes as dedicated unprivileged system users, drop root capabilities, and apply container security profiles.",
-      "references": [
-        "OWASP pytm AC01",
-        "CWE-250",
-        "CAPEC-122"
       ],
       "file_path": "examples/celery"
     },
@@ -1006,24 +957,6 @@
       "file_path": "examples/javascript/js_example"
     },
     {
-      "threat_id": "STRIDE-S-01",
-      "category": "Spoofing",
-      "stride_letter": "S",
-      "severity": "Critical",
-      "target_type": "process",
-      "component_id": "process:examples/tutorial/flaskr",
-      "component_name": "flaskr",
-      "title": "Unauthenticated Process or API Endpoint",
-      "description": "Endpoints or processes without enforced authentication allow untrusted adversaries to forge requests and impersonate legitimate clients.",
-      "mitigation": "Enforce strong authentication mechanisms (OAuth 2.0, OpenID Connect, JWT or API Keys) before executing business logic.",
-      "references": [
-        "OWASP pytm AA01",
-        "CWE-287",
-        "CAPEC-115"
-      ],
-      "file_path": "examples/tutorial/flaskr"
-    },
-    {
       "threat_id": "STRIDE-S-03",
       "category": "Spoofing",
       "stride_letter": "S",
@@ -1352,24 +1285,6 @@
       "file_path": "src/flask"
     },
     {
-      "threat_id": "STRIDE-R-01",
-      "category": "Repudiation",
-      "stride_letter": "R",
-      "severity": "Medium",
-      "target_type": "process",
-      "component_id": "process:src/flask",
-      "component_name": "flask",
-      "title": "Missing Security Audit Logging",
-      "description": "Critical business transactions and security state transitions occur without generating audit trails, allowing actors to repudiate actions.",
-      "mitigation": "Implement non-repudiable audit logging for sensitive operations including identity, timestamp, action, and outcome.",
-      "references": [
-        "OWASP pytm AC03",
-        "CWE-778",
-        "CAPEC-93"
-      ],
-      "file_path": "src/flask"
-    },
-    {
       "threat_id": "STRIDE-I-05",
       "category": "Information Disclosure",
       "stride_letter": "I",
@@ -1439,24 +1354,6 @@
         "CWE-22",
         "OWASP Top 10 A01:2021",
         "CAPEC-126"
-      ],
-      "file_path": "src/flask"
-    },
-    {
-      "threat_id": "STRIDE-E-01",
-      "category": "Elevation of Privilege",
-      "stride_letter": "E",
-      "severity": "Critical",
-      "target_type": "process",
-      "component_id": "process:src/flask",
-      "component_name": "flask",
-      "title": "Missing Principle of Least Privilege (PoLP)",
-      "description": "Process executes with elevated operating system or cluster privileges, allowing an attacker who breaches it to compromise the entire host.",
-      "mitigation": "Run processes as dedicated unprivileged system users, drop root capabilities, and apply container security profiles.",
-      "references": [
-        "OWASP pytm AC01",
-        "CWE-250",
-        "CAPEC-122"
       ],
       "file_path": "src/flask"
     },
@@ -1535,24 +1432,6 @@
       "file_path": "src/flask/json"
     },
     {
-      "threat_id": "STRIDE-R-01",
-      "category": "Repudiation",
-      "stride_letter": "R",
-      "severity": "Medium",
-      "target_type": "process",
-      "component_id": "process:src/flask/json",
-      "component_name": "json",
-      "title": "Missing Security Audit Logging",
-      "description": "Critical business transactions and security state transitions occur without generating audit trails, allowing actors to repudiate actions.",
-      "mitigation": "Implement non-repudiable audit logging for sensitive operations including identity, timestamp, action, and outcome.",
-      "references": [
-        "OWASP pytm AC03",
-        "CWE-778",
-        "CAPEC-93"
-      ],
-      "file_path": "src/flask/json"
-    },
-    {
       "threat_id": "STRIDE-I-05",
       "category": "Information Disclosure",
       "stride_letter": "I",
@@ -1622,24 +1501,6 @@
         "CWE-22",
         "OWASP Top 10 A01:2021",
         "CAPEC-126"
-      ],
-      "file_path": "src/flask/json"
-    },
-    {
-      "threat_id": "STRIDE-E-01",
-      "category": "Elevation of Privilege",
-      "stride_letter": "E",
-      "severity": "Critical",
-      "target_type": "process",
-      "component_id": "process:src/flask/json",
-      "component_name": "json",
-      "title": "Missing Principle of Least Privilege (PoLP)",
-      "description": "Process executes with elevated operating system or cluster privileges, allowing an attacker who breaches it to compromise the entire host.",
-      "mitigation": "Run processes as dedicated unprivileged system users, drop root capabilities, and apply container security profiles.",
-      "references": [
-        "OWASP pytm AC01",
-        "CWE-250",
-        "CAPEC-122"
       ],
       "file_path": "src/flask/json"
     },
@@ -1718,24 +1579,6 @@
       "file_path": "src/flask/sansio"
     },
     {
-      "threat_id": "STRIDE-R-01",
-      "category": "Repudiation",
-      "stride_letter": "R",
-      "severity": "Medium",
-      "target_type": "process",
-      "component_id": "process:src/flask/sansio",
-      "component_name": "sansio",
-      "title": "Missing Security Audit Logging",
-      "description": "Critical business transactions and security state transitions occur without generating audit trails, allowing actors to repudiate actions.",
-      "mitigation": "Implement non-repudiable audit logging for sensitive operations including identity, timestamp, action, and outcome.",
-      "references": [
-        "OWASP pytm AC03",
-        "CWE-778",
-        "CAPEC-93"
-      ],
-      "file_path": "src/flask/sansio"
-    },
-    {
       "threat_id": "STRIDE-I-05",
       "category": "Information Disclosure",
       "stride_letter": "I",
@@ -1805,24 +1648,6 @@
         "CWE-22",
         "OWASP Top 10 A01:2021",
         "CAPEC-126"
-      ],
-      "file_path": "src/flask/sansio"
-    },
-    {
-      "threat_id": "STRIDE-E-01",
-      "category": "Elevation of Privilege",
-      "stride_letter": "E",
-      "severity": "Critical",
-      "target_type": "process",
-      "component_id": "process:src/flask/sansio",
-      "component_name": "sansio",
-      "title": "Missing Principle of Least Privilege (PoLP)",
-      "description": "Process executes with elevated operating system or cluster privileges, allowing an attacker who breaches it to compromise the entire host.",
-      "mitigation": "Run processes as dedicated unprivileged system users, drop root capabilities, and apply container security profiles.",
-      "references": [
-        "OWASP pytm AC01",
-        "CWE-250",
-        "CAPEC-122"
       ],
       "file_path": "src/flask/sansio"
     },
@@ -2131,38 +1956,6 @@
       ]
     },
     {
-      "threat_id": "STRIDE-D-03",
-      "category": "Denial of Service",
-      "stride_letter": "D",
-      "severity": "Medium",
-      "target_type": "data_store",
-      "component_id": "data_store:sqlite",
-      "component_name": "SQLite",
-      "title": "Datastore Capacity Exhaustion",
-      "description": "Datastores without data retention limits or volume quotas can be exhausted by continuous writes, crashing dependent applications.",
-      "mitigation": "Set disk quotas, automated retention policies, and monitoring alerts for storage capacity.",
-      "references": [
-        "OWASP pytm DO03",
-        "CWE-400"
-      ]
-    },
-    {
-      "threat_id": "STRIDE-D-04",
-      "category": "Denial of Service",
-      "stride_letter": "D",
-      "severity": "High",
-      "target_type": "data_store",
-      "component_id": "data_store:sqlite",
-      "component_name": "SQLite",
-      "title": "Datastore Unavailability and Data Loss from Missing Backups",
-      "description": "Datastore lacks automated backups and multi-region replication, leading to permanent denial of service and data loss during hardware failure or ransomware.",
-      "mitigation": "Enable automated daily snapshots, point-in-time recovery (PITR), and cross-region replication for persistent data stores.",
-      "references": [
-        "OWASP pytm DS01",
-        "CWE-400"
-      ]
-    },
-    {
       "threat_id": "STRIDE-S-04",
       "category": "Spoofing",
       "stride_letter": "S",
@@ -2298,38 +2091,6 @@
       ]
     },
     {
-      "threat_id": "STRIDE-D-03",
-      "category": "Denial of Service",
-      "stride_letter": "D",
-      "severity": "Medium",
-      "target_type": "data_store",
-      "component_id": "data_store:file-storage",
-      "component_name": "File storage",
-      "title": "Datastore Capacity Exhaustion",
-      "description": "Datastores without data retention limits or volume quotas can be exhausted by continuous writes, crashing dependent applications.",
-      "mitigation": "Set disk quotas, automated retention policies, and monitoring alerts for storage capacity.",
-      "references": [
-        "OWASP pytm DO03",
-        "CWE-400"
-      ]
-    },
-    {
-      "threat_id": "STRIDE-D-04",
-      "category": "Denial of Service",
-      "stride_letter": "D",
-      "severity": "High",
-      "target_type": "data_store",
-      "component_id": "data_store:file-storage",
-      "component_name": "File storage",
-      "title": "Datastore Unavailability and Data Loss from Missing Backups",
-      "description": "Datastore lacks automated backups and multi-region replication, leading to permanent denial of service and data loss during hardware failure or ransomware.",
-      "mitigation": "Enable automated daily snapshots, point-in-time recovery (PITR), and cross-region replication for persistent data stores.",
-      "references": [
-        "OWASP pytm DS01",
-        "CWE-400"
-      ]
-    },
-    {
       "threat_id": "STRIDE-S-02",
       "category": "Spoofing",
       "stride_letter": "S",
@@ -2410,26 +2171,6 @@
       "protocol": null
     },
     {
-      "threat_id": "STRIDE-S-02",
-      "category": "Spoofing",
-      "stride_letter": "S",
-      "severity": "High",
-      "target_type": "data_flow",
-      "component_id": "external_entity:client->process:examples/celery/src/task_app:HTTP requests",
-      "component_name": "HTTP requests",
-      "title": "Missing Mutual Authentication on Data Flow",
-      "description": "The communication channel does not authenticate the origin of the data flow, enabling man-in-the-middle spoofing attacks.",
-      "mitigation": "Implement mutual TLS (mTLS) or signed request tokens to authenticate the source component.",
-      "references": [
-        "OWASP pytm CR01",
-        "CWE-290",
-        "CAPEC-115"
-      ],
-      "source": "external_entity:client",
-      "target": "process:examples/celery/src/task_app",
-      "protocol": null
-    },
-    {
       "threat_id": "STRIDE-T-01",
       "category": "Tampering",
       "stride_letter": "T",
@@ -2487,26 +2228,6 @@
       ],
       "source": "external_entity:client",
       "target": "process:examples/celery/src/task_app",
-      "protocol": null
-    },
-    {
-      "threat_id": "STRIDE-S-02",
-      "category": "Spoofing",
-      "stride_letter": "S",
-      "severity": "High",
-      "target_type": "data_flow",
-      "component_id": "external_entity:client->process:examples/celery/src/task_app/templates:submits form",
-      "component_name": "submits form",
-      "title": "Missing Mutual Authentication on Data Flow",
-      "description": "The communication channel does not authenticate the origin of the data flow, enabling man-in-the-middle spoofing attacks.",
-      "mitigation": "Implement mutual TLS (mTLS) or signed request tokens to authenticate the source component.",
-      "references": [
-        "OWASP pytm CR01",
-        "CWE-290",
-        "CAPEC-115"
-      ],
-      "source": "external_entity:client",
-      "target": "process:examples/celery/src/task_app/templates",
       "protocol": null
     },
     {
@@ -2570,26 +2291,6 @@
       "protocol": null
     },
     {
-      "threat_id": "STRIDE-S-02",
-      "category": "Spoofing",
-      "stride_letter": "S",
-      "severity": "High",
-      "target_type": "data_flow",
-      "component_id": "external_entity:client->process:examples/javascript/js_example:HTTP requests",
-      "component_name": "HTTP requests",
-      "title": "Missing Mutual Authentication on Data Flow",
-      "description": "The communication channel does not authenticate the origin of the data flow, enabling man-in-the-middle spoofing attacks.",
-      "mitigation": "Implement mutual TLS (mTLS) or signed request tokens to authenticate the source component.",
-      "references": [
-        "OWASP pytm CR01",
-        "CWE-290",
-        "CAPEC-115"
-      ],
-      "source": "external_entity:client",
-      "target": "process:examples/javascript/js_example",
-      "protocol": null
-    },
-    {
       "threat_id": "STRIDE-T-01",
       "category": "Tampering",
       "stride_letter": "T",
@@ -2647,26 +2348,6 @@
       ],
       "source": "external_entity:client",
       "target": "process:examples/javascript/js_example",
-      "protocol": null
-    },
-    {
-      "threat_id": "STRIDE-S-02",
-      "category": "Spoofing",
-      "stride_letter": "S",
-      "severity": "High",
-      "target_type": "data_flow",
-      "component_id": "external_entity:client->process:examples/javascript/js_example/templates:submits form",
-      "component_name": "submits form",
-      "title": "Missing Mutual Authentication on Data Flow",
-      "description": "The communication channel does not authenticate the origin of the data flow, enabling man-in-the-middle spoofing attacks.",
-      "mitigation": "Implement mutual TLS (mTLS) or signed request tokens to authenticate the source component.",
-      "references": [
-        "OWASP pytm CR01",
-        "CWE-290",
-        "CAPEC-115"
-      ],
-      "source": "external_entity:client",
-      "target": "process:examples/javascript/js_example/templates",
       "protocol": null
     },
     {
@@ -2890,26 +2571,6 @@
       "protocol": null
     },
     {
-      "threat_id": "STRIDE-S-02",
-      "category": "Spoofing",
-      "stride_letter": "S",
-      "severity": "High",
-      "target_type": "data_flow",
-      "component_id": "external_entity:client->process:examples/tutorial/flaskr:HTTP requests",
-      "component_name": "HTTP requests",
-      "title": "Missing Mutual Authentication on Data Flow",
-      "description": "The communication channel does not authenticate the origin of the data flow, enabling man-in-the-middle spoofing attacks.",
-      "mitigation": "Implement mutual TLS (mTLS) or signed request tokens to authenticate the source component.",
-      "references": [
-        "OWASP pytm CR01",
-        "CWE-290",
-        "CAPEC-115"
-      ],
-      "source": "external_entity:client",
-      "target": "process:examples/tutorial/flaskr",
-      "protocol": null
-    },
-    {
       "threat_id": "STRIDE-T-01",
       "category": "Tampering",
       "stride_letter": "T",
@@ -3050,26 +2711,6 @@
       "protocol": null
     },
     {
-      "threat_id": "STRIDE-S-02",
-      "category": "Spoofing",
-      "stride_letter": "S",
-      "severity": "High",
-      "target_type": "data_flow",
-      "component_id": "external_entity:client->process:examples/tutorial/flaskr/templates/auth:submits form",
-      "component_name": "submits form",
-      "title": "Missing Mutual Authentication on Data Flow",
-      "description": "The communication channel does not authenticate the origin of the data flow, enabling man-in-the-middle spoofing attacks.",
-      "mitigation": "Implement mutual TLS (mTLS) or signed request tokens to authenticate the source component.",
-      "references": [
-        "OWASP pytm CR01",
-        "CWE-290",
-        "CAPEC-115"
-      ],
-      "source": "external_entity:client",
-      "target": "process:examples/tutorial/flaskr/templates/auth",
-      "protocol": null
-    },
-    {
       "threat_id": "STRIDE-T-01",
       "category": "Tampering",
       "stride_letter": "T",
@@ -3127,26 +2768,6 @@
       ],
       "source": "external_entity:client",
       "target": "process:examples/tutorial/flaskr/templates/auth",
-      "protocol": null
-    },
-    {
-      "threat_id": "STRIDE-S-02",
-      "category": "Spoofing",
-      "stride_letter": "S",
-      "severity": "High",
-      "target_type": "data_flow",
-      "component_id": "external_entity:client->process:examples/tutorial/flaskr/templates/blog:submits form",
-      "component_name": "submits form",
-      "title": "Missing Mutual Authentication on Data Flow",
-      "description": "The communication channel does not authenticate the origin of the data flow, enabling man-in-the-middle spoofing attacks.",
-      "mitigation": "Implement mutual TLS (mTLS) or signed request tokens to authenticate the source component.",
-      "references": [
-        "OWASP pytm CR01",
-        "CWE-290",
-        "CAPEC-115"
-      ],
-      "source": "external_entity:client",
-      "target": "process:examples/tutorial/flaskr/templates/blog",
       "protocol": null
     },
     {

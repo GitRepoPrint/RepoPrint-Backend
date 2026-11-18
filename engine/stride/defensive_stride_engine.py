@@ -262,6 +262,36 @@ class StrideEngine:
             if not uses_serialization:
                 return False
 
+        # Action 1: Check if this component is passive library / framework code (not a standalone running OS daemon)
+        is_library = (
+            ("files" in extra or path.startswith(("src/", "lib/")))
+            and route_count == 0
+            and not receives_external_traffic
+            and not any("main" in str(d).lower() for d in extra.get("definitions", []))
+        )
+        daemon_process_rules = {
+            "STRIDE-E-01",  # Principle of Least Privilege / daemon running as root
+            "STRIDE-R-01",  # Security Audit Logging for application events
+            "STRIDE-D-01",  # Rate Limiting
+        }
+        if is_library and rid in daemon_process_rules:
+            return False
+
+        # Action 1: Embedded / Local File Datastore vs Remote Cloud Datastore
+        tech = str(elem.get("technology") or "").lower()
+        is_embedded_datastore = (
+            any(t in tech for t in ["sqlite", "file-storage", "local_file", "disk"])
+            or path.endswith((".db", ".sqlite", ".sqlite3"))
+            or "sqlite" in str(elem.get("id", "")).lower()
+            or "file-storage" in str(elem.get("id", "")).lower()
+        )
+        remote_cluster_datastore_rules = {
+            "STRIDE-D-04",  # Missing backup and replication in cluster/cloud
+            "STRIDE-D-03",  # Quota limits / volume capacity exhaustion
+        }
+        if is_embedded_datastore and rid in remote_cluster_datastore_rules:
+            return False
+
         return True
 
     def _is_rule_applicable_to_flow(
@@ -313,6 +343,10 @@ class StrideEngine:
         if rid in network_rules and not is_network:
             return False
 
+        # Action 1: Public web browser clients accessing web endpoints do not present mTLS client certificates
+        if rid == "STRIDE-S-02" and src_id == "external_entity:client" and label in ["submits form", "http requests"]:
+            return False
+
         return True
 
     def _normalize_dfd(self, dfd: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -356,6 +390,25 @@ class StrideEngine:
         for k, v in component.items():
             if k not in ("properties", "extra", "provenance"):
                 props[k] = v
+
+        # Action 1: Infer authentication from rich code metadata if not explicitly declared
+        if props.get("provides_authentication") is None:
+            defs = [str(d).lower() for d in props.get("definitions", [])]
+            auth_keywords = [
+                "login", "authenticate", "require_login", "load_logged_in_user",
+                "verify_password", "check_password", "jwt", "session_token",
+            ]
+            files = [str(f).lower() for f in props.get("files", [])]
+            routes = props.get("routes", [])
+            route_paths = [str(r.get("path", "")).lower() for r in routes if isinstance(r, dict)]
+
+            has_auth_logic = (
+                any(any(kw in d for kw in auth_keywords) for d in defs)
+                or any(any(kw in f for kw in ["/auth.", "/security.", "auth.py", "security.py"]) for f in files)
+                or any(any(kw in p for kw in ["/login", "/auth", "/register"]) for p in route_paths)
+            )
+            if has_auth_logic:
+                props["provides_authentication"] = True
 
         return props
 

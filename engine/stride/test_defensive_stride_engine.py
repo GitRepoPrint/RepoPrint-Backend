@@ -802,4 +802,119 @@ def test_internal_library_without_routes_does_not_trigger_api_endpoint_threats()
     assert "STRIDE-T-02" in threat_ids
 
 
+def test_action1_auth_inference_from_definitions():
+    """Action 1: Verify that authentication is inferred when functions like login/auth are defined."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/auth-app",
+        "nodes": [
+            {
+                "id": "process:app/auth",
+                "kind": "process",
+                "name": "Auth App",
+                "path": "app/auth.py",
+                "extra": {
+                    "definitions": ["function login", "function register", "function require_login"],
+                    "routes": [{"method": "POST", "path": "/login"}],
+                    "route_count": 1,
+                },
+            }
+        ],
+        "edges": [],
+    }
+    result = engine.analyze(dfd)
+    findings = result["findings"]
+    threat_ids = [f["threat_id"] for f in findings if f["component_id"] == "process:app/auth"]
+    # STRIDE-S-01 (Unauthenticated API endpoint) should be mitigated by inferred authentication
+    assert "STRIDE-S-01" not in threat_ids
+
+
+def test_action1_library_module_exempt_from_daemon_least_privilege_and_audit():
+    """Action 1: Verify that passive library modules in src/ are exempt from OS daemon least privilege & audit logging."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/library",
+        "nodes": [
+            {
+                "id": "process:src/lib/json_encoder",
+                "kind": "process",
+                "name": "json_encoder",
+                "path": "src/lib/json_encoder.py",
+                "extra": {
+                    "files": ["src/lib/json_encoder.py"],
+                    "definitions": ["class JsonEncoder", "function dump"],
+                    "routes": [],
+                    "route_count": 0,
+                },
+            }
+        ],
+        "edges": [],
+    }
+    result = engine.analyze(dfd)
+    findings = result["findings"]
+    threat_ids = [f["threat_id"] for f in findings if f["component_id"] == "process:src/lib/json_encoder"]
+    # Daemon-specific rules should NOT fire on passive library code
+    assert "STRIDE-E-01" not in threat_ids  # Missing PoLP / OS user
+    assert "STRIDE-R-01" not in threat_ids  # Missing Audit Logging
+    assert "STRIDE-D-01" not in threat_ids  # Rate Limiting
+
+
+def test_action1_embedded_sqlite_exempt_from_cluster_backup_replication():
+    """Action 1: Verify that local embedded sqlite files do not produce cloud cluster replication threats."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/sqlite-app",
+        "nodes": [
+            {
+                "id": "data_store:sqlite",
+                "kind": "data_store",
+                "name": "Local SQLite DB",
+                "technology": "sqlite",
+                "path": "app/db.sqlite3",
+            }
+        ],
+        "edges": [],
+    }
+    result = engine.analyze(dfd)
+    findings = result["findings"]
+    threat_ids = [f["threat_id"] for f in findings if f["component_id"] == "data_store:sqlite"]
+    # Cloud cluster replication / volume quotas should NOT fire on embedded SQLite
+    assert "STRIDE-D-04" not in threat_ids
+    assert "STRIDE-D-03" not in threat_ids
+    # Storage encryption at rest (STRIDE-I-02) and unauthorized modification (STRIDE-T-04) still fire
+    assert "STRIDE-I-02" in threat_ids
+    assert "STRIDE-T-04" in threat_ids
+
+
+def test_action1_anonymous_browser_client_exempt_from_mtls():
+    """Action 1: Verify that anonymous web browsers accessing web routes are not flagged for missing mTLS."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/web-app",
+        "nodes": [
+            {"id": "external_entity:client", "kind": "external_entity", "name": "Web Browser"},
+            {"id": "process:app/web", "kind": "process", "name": "Web Server", "extra": {"route_count": 1}},
+        ],
+        "edges": [
+            {
+                "id": "flow_web",
+                "source": "external_entity:client",
+                "target": "process:app/web",
+                "label": "HTTP requests",
+                "protocol": "HTTP",
+                "is_encrypted": False,
+            }
+        ],
+    }
+    result = engine.analyze(dfd)
+    findings = result["findings"]
+    threat_ids = [f["threat_id"] for f in findings if f.get("component_id") == "flow_web"]
+    # Cleartext HTTP (STRIDE-I-01) and in-transit tampering (STRIDE-T-01) DO fire
+    assert "STRIDE-I-01" in threat_ids
+    assert "STRIDE-T-01" in threat_ids
+    # mTLS client certificate (STRIDE-S-02) does NOT fire on anonymous browser client
+    assert "STRIDE-S-02" not in threat_ids
+
+
+
 
