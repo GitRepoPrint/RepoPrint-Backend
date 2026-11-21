@@ -104,11 +104,11 @@ async def _admit(request: Request, url: str, group_by: str, user: User | None= N
     return _Admission(key, owner, repo, group_by, None, lease)
 
 
-async def _private_token(admission: _Admission, user: User | None, session: AsyncSession) -> str | None:
+async def resolve_private_token(user: User | None, session: AsyncSession, owner: str, repo: str) -> str | None:
     if user is None:
         return None
     try:
-        token= await github_app.private_token(session, user, admission.owner, admission.repo)
+        return await github_app.private_token(session, user, owner, repo)
     except GitHubAppError as error:
         raise HTTPException(status_code=error.status, detail={"code": error.code, "message": error.message} if error.code else error.message)
     except GitHubOAuthError as error:
@@ -116,6 +116,10 @@ async def _private_token(admission: _Admission, user: User | None, session: Asyn
     except (GitHubError, httpx.HTTPError) as error:
         status, detail= _failure(error)
         raise HTTPException(status_code=status, detail=detail)
+
+
+async def _private_token(admission: _Admission, user: User | None, session: AsyncSession) -> str | None:
+    token= await resolve_private_token(user, session, admission.owner, admission.repo)
     if token:
         admission.key= ("private", str(user.id), *admission.key)
     return token

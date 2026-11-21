@@ -40,6 +40,15 @@ class FakeGitHubApp:
         self.oauth_sees= {"org/Priv", "pub/Lic"}
         self.token_requests= []
         self.token_bearers= []
+        self.tarball_calls= []
+        self.archive_files= {
+            "docker-compose.yml": "services: {}\n",
+            "src/Dockerfile": "FROM python\n",
+            "src/app.py": "print('x')\n",
+            "package.json": '{"name": "x"}\n',
+            "node_modules/x/package.json": "{}\n",
+            "docs/compose.yml": "x: 1\n",
+        }
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path= request.url.path
@@ -52,6 +61,11 @@ class FakeGitHubApp:
         if path== "/user/installations":
             visible= list(self.visible.values()) if auth== "ghu_user" else []
             return httpx.Response(200, json={"installations": visible})
+        if path.startswith("/repos/org/") and path.endswith("/tarball"):
+            if auth != INSTALL_TOKEN:
+                return httpx.Response(404)
+            self.tarball_calls.append(auth)
+            return httpx.Response(200, content=archive_of(self.archive_files).getvalue())
         if path.endswith("/installation"):
             claims= jwt.decode(auth, APP_KEY.public_key(), algorithms=["RS256"])
             assert claims["iss"]== "123"
