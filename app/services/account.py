@@ -9,6 +9,7 @@ from app.models import (
     ChatMessage,
     DfdGraph,
     FalsePositiveFeedback,
+    GitHubInstallation,
     Repository,
     Team,
     TeamMember,
@@ -40,6 +41,7 @@ async def export_user_data(session: AsyncSession, user: User) -> dict:
     return {
         "account": row_dict(user),
         "linked_accounts": await rows(session, UserOAuth, UserOAuth.user_id == user.id),
+        "github_installations": await rows(session, GitHubInstallation, GitHubInstallation.user_id == user.id),
         "teams_owned": await rows(session, Team, Team.owner_id == user.id),
         "team_memberships": await rows(session, TeamMember, TeamMember.user_id == user.id),
         "repositories": repositories,

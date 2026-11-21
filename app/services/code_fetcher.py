@@ -99,10 +99,10 @@ def read_archive(archive: io.IOBase) -> list[SourceFile]:
     return files
 
 
-async def download_archive(owner: str, repo: str) -> tempfile.SpooledTemporaryFile:
+async def download_archive(owner: str, repo: str, token: str | None= None) -> tempfile.SpooledTemporaryFile:
     spool= tempfile.SpooledTemporaryFile(max_size=16 * 1024 * 1024)
     try:
-        async with httpx.AsyncClient(base_url=settings.github_api_url, headers=_headers(), timeout=60, follow_redirects=True) as client:
+        async with httpx.AsyncClient(base_url=settings.github_api_url, headers=_headers(token), timeout=60, follow_redirects=True) as client:
             async with client.stream("GET", f"/repos/{owner}/{repo}/tarball") as response:
                 if response.is_error:
                     _raise_for(response)
@@ -366,10 +366,12 @@ async def fetch_sources_graphql(
     return files, sum(contents.get(item["path"]) is None for item in chosen)
 
 
-async def _from_archive(owner: str, repo: str, progress: Progress | None, archive_loader: Callable[[], Awaitable] | None) -> FetchResult:
+async def _from_archive(
+    owner: str, repo: str, progress: Progress | None, archive_loader: Callable[[], Awaitable] | None, token: str | None= None,
+) -> FetchResult:
     if progress:
         progress("downloading", 0, 0)
-    archive= await (archive_loader() if archive_loader else download_archive(owner, repo))
+    archive= await (archive_loader() if archive_loader else download_archive(owner, repo, token))
     try:
         files= await asyncio.to_thread(read_archive, archive)
     finally:
@@ -379,19 +381,19 @@ async def _from_archive(owner: str, repo: str, progress: Progress | None, archiv
 
 async def fetch_repository_files(
     owner: str, repo: str, *, progress: Progress | None= None, client: httpx.AsyncClient | None= None,
-    archive_loader: Callable[[], Awaitable] | None= None,
+    archive_loader: Callable[[], Awaitable] | None= None, token: str | None= None,
 ) -> FetchResult:
     """O código de um repositório público. Lista os ficheiros e lê só os de código, em paralelo; num repositório muito grande lê uma
     amostra justa (FetchResult.sampled). Se isso não for possível (a rede falha, ou a maioria dos ficheiros não se lê) descarrega o
     arquivo inteiro. Um repositório que não existe ou um limite de pedidos do GitHub são erros e não se tentam de outra maneira."""
     if settings.dfd_fetch_method == "archive":
-        return await _from_archive(owner, repo, progress, archive_loader)
+        return await _from_archive(owner, repo, progress, archive_loader, token)
 
     own= client is None
     if client is None:
         concurrency= settings.dfd_fetch_concurrency
         client= httpx.AsyncClient(
-            base_url=settings.github_api_url, headers=_headers(), timeout=30, follow_redirects=True,
+            base_url=settings.github_api_url, headers=_headers(token), timeout=30, follow_redirects=True,
             limits=httpx.Limits(max_connections=concurrency + 8, max_keepalive_connections=concurrency + 8),
         )
     try:
@@ -401,7 +403,7 @@ async def fetch_repository_files(
         candidates= candidate_files(listing.entries)
         # Com token, a API GraphQL dá cerca de 100 ficheiros por pedido: dá para ler muitos. Sem token cada ficheiro é um pedido ao
         # raw.githubusercontent.com (que tem limites) e a amostra é mais pequena.
-        graphql= bool(settings.github_token)
+        graphql= bool(token or settings.github_token)
         chosen= sample_files(candidates, MAX_SAMPLED_FILES if graphql else min(MAX_SAMPLED_FILES, MAX_SAMPLED_FILES_RAW), MAX_TOTAL_BYTES)
         if graphql:
             files, failed= await fetch_sources_graphql(client, owner, repo, chosen, progress=progress)
@@ -411,7 +413,7 @@ async def fetch_repository_files(
             raise _Unreadable()
         return FetchResult(files, len(candidates), len(chosen) < len(candidates), listing.truncated, "graphql" if graphql else "tree")
     except (_Unreadable, httpx.HTTPError):
-        return await _from_archive(owner, repo, progress, archive_loader)
+        return await _from_archive(owner, repo, progress, archive_loader, token)
     finally:
         if own:
             await client.aclose()

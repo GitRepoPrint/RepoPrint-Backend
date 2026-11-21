@@ -238,7 +238,7 @@ class TestParsingInParallel:
 
 
 def test_a_result_from_the_new_fetcher_is_analysed_like_any_other(monkeypatch):
-    async def fake_fetch(owner, repo, *, progress=None, archive_loader=None, client=None):
+    async def fake_fetch(owner, repo, *, progress=None, archive_loader=None, client=None, token=None):
         progress and progress("listing", 0, 0)
         return FetchResult([SourceFile(p, "python", t.encode()) for p, t in FILES.items() if p.endswith(".py")], 900, True, True, "tree")
 

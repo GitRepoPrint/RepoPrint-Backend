@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import LargeBinary, String, UniqueConstraint
+from sqlalchemy import BigInteger, DateTime, LargeBinary, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAtMixin, IdMixin, foreign_key
@@ -25,6 +26,18 @@ class UserOAuth(IdMixin, CreatedAtMixin, Base):
     provider_username: Mapped[str | None]= mapped_column(String)
     access_token: Mapped[bytes]= mapped_column(LargeBinary)
     refresh_token: Mapped[bytes | None]= mapped_column(LargeBinary)
+
+
+class GitHubInstallation(IdMixin, CreatedAtMixin, Base):
+    __tablename__= "github_installations"
+    __table_args__= (UniqueConstraint("user_id", "installation_id"),)
+
+    user_id: Mapped[uuid.UUID]= foreign_key("users.id")
+    installation_id: Mapped[int]= mapped_column(BigInteger)
+    account_login: Mapped[str]= mapped_column(String)
+    account_type: Mapped[str]= mapped_column(String)
+    repository_selection: Mapped[str]= mapped_column(String)
+    failed_since: Mapped[datetime | None]= mapped_column(DateTime(timezone=True))
 
 
 class Team(IdMixin, CreatedAtMixin, Base):

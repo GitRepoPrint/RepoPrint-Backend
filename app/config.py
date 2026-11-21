@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     github_oauth_url: str= "https://github.com"
     github_api_url: str= "https://api.github.com"
     token_encryption_key: SecretStr | None= None
+    github_app_id: str | None= None
+    github_app_slug: str | None= None
+    github_app_client_id: str | None= None
+    github_app_client_secret: SecretStr | None= None
+    github_app_private_key: SecretStr | None= None
+    github_app_redirect_uri: str= "http://localhost:3000/api/github/app/callback"
 
     model_config= SettingsConfigDict(env_file=".env", extra="ignore")
 

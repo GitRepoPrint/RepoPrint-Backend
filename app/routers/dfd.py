@@ -5,14 +5,21 @@ from dataclasses import dataclass
 from typing import Callable, Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session import get_session
+from app.models import User
 from app.schemas.dfd import DfdGraph
+from app.services import github_app
+from app.services.auth import optional_user
 from app.services.code_fetcher import FetchResult, download_archive, fetch_repository_files
 from app.services.dfd import build_dfd, parse_files
 from app.services.dfd_schema import to_schema
 from app.services.github import GitHubError, parse_repo_url
+from app.services.github_app import GitHubAppError
+from app.services.github_oauth import GitHubOAuthError
 from app.services.guard import Lease
 
 router= APIRouter(prefix="/dfd", tags=["dfd"])
@@ -40,9 +47,12 @@ def _analyse(fetched: FetchResult, group_by: str, progress: Progress | None= Non
     return graph
 
 
-async def _analyse_repository(owner: str, repo: str, group_by: str, progress: Progress | None= None) -> dict:
+async def _analyse_repository(owner: str, repo: str, group_by: str, progress: Progress | None= None, token: str | None= None) -> dict:
     # `download_archive` é o plano B (e o único método com dfd_fetch_method="archive"): vai-se buscar aqui ao módulo, a cada chamada
-    fetched= await fetch_repository_files(owner, repo, progress=progress, archive_loader=lambda: download_archive(owner, repo))
+    extra= {"token": token} if token else {}
+    fetched= await fetch_repository_files(
+        owner, repo, progress=progress, token=token, archive_loader=lambda: download_archive(owner, repo, **extra)
+    )
     graph= await asyncio.to_thread(_analyse, fetched, group_by, progress)
     return to_schema(graph, owner, repo, group_by)
 
@@ -66,7 +76,7 @@ class _Admission:
     lease: Lease | None
 
 
-async def _admit(request: Request, url: str, group_by: str) -> _Admission:
+async def _admit(request: Request, url: str, group_by: str, user: User | None= None) -> _Admission:
     """O que vem antes de analisar: o endereço, a cache, o limite por cliente e a vaga. Falha com o código HTTP certo."""
     guard= request.app.state.guard
     try:
@@ -79,6 +89,11 @@ async def _admit(request: Request, url: str, group_by: str) -> _Admission:
     cached= guard.cache.get(key)
     if cached is not None:
         return _Admission(key, owner, repo, group_by, cached, None)
+    if user is not None:
+        private_key= ("private", str(user.id), *key)
+        cached= guard.cache.get(private_key)
+        if cached is not None:
+            return _Admission(private_key, owner, repo, group_by, cached, None)
 
     wait= guard.limiter.check(guard.client_id(request.client.host if request.client else None, request.headers.get("x-forwarded-for")))
     if wait > 0:
@@ -89,17 +104,37 @@ async def _admit(request: Request, url: str, group_by: str) -> _Admission:
     return _Admission(key, owner, repo, group_by, None, lease)
 
 
+async def _private_token(admission: _Admission, user: User | None, session: AsyncSession) -> str | None:
+    if user is None:
+        return None
+    try:
+        token= await github_app.private_token(session, user, admission.owner, admission.repo)
+    except GitHubAppError as error:
+        raise HTTPException(status_code=error.status, detail={"code": error.code, "message": error.message} if error.code else error.message)
+    except GitHubOAuthError as error:
+        raise HTTPException(status_code=error.status, detail=error.message)
+    except (GitHubError, httpx.HTTPError) as error:
+        status, detail= _failure(error)
+        raise HTTPException(status_code=status, detail=detail)
+    if token:
+        admission.key= ("private", str(user.id), *admission.key)
+    return token
+
+
 @router.get("", response_model=DfdGraph)
 async def get_dfd(
     request: Request,
-    url: str= Query(..., description="URL do repositório GitHub público"),
+    url: str= Query(..., description="URL do repositório GitHub"),
     group_by: Literal["directory", "file"]= Query("directory", description="Granularidade dos processos"),
+    user: User | None= Depends(optional_user),
+    session: AsyncSession= Depends(get_session),
 ):
-    admission= await _admit(request, url, group_by)
+    admission= await _admit(request, url, group_by, user)
     if admission.cached is not None:
         return admission.cached
     try:
-        result= await _analyse_repository(admission.owner, admission.repo, group_by)
+        token= await _private_token(admission, user, session)
+        result= await _analyse_repository(admission.owner, admission.repo, group_by, token=token)
         request.app.state.guard.cache.set(admission.key, result)
         return result
     except (GitHubError, httpx.HTTPError) as error:
@@ -121,8 +156,10 @@ def _line(event: dict) -> str:
 @router.get("/stream")
 async def stream_dfd(
     request: Request,
-    url: str= Query(..., description="URL do repositório GitHub público"),
+    url: str= Query(..., description="URL do repositório GitHub"),
     group_by: Literal["directory", "file"]= Query("directory", description="Granularidade dos processos"),
+    user: User | None= Depends(optional_user),
+    session: AsyncSession= Depends(get_session),
 ):
     """A mesma análise do GET /dfd, em NDJSON (uma linha de JSON por evento), para o interface mostrar o avanço a sério:
 
@@ -131,7 +168,7 @@ async def stream_dfd(
         {"type":"error","status":404,"detail":"..."}                                             (o fim, se a análise falhou)
 
     O que se recusa antes de começar (endereço mau, limite por cliente, servidor ocupado) é um erro HTTP normal."""
-    admission= await _admit(request, url, group_by)
+    admission= await _admit(request, url, group_by, user)
     guard= request.app.state.guard
 
     if admission.cached is not None:
@@ -139,6 +176,12 @@ async def stream_dfd(
             yield _line(_result_event(admission.cached))
 
         return StreamingResponse(cached(), media_type="application/x-ndjson")
+
+    try:
+        token= await _private_token(admission, user, session)
+    except BaseException:
+        admission.lease.release()
+        raise
 
     async def events():
         loop= asyncio.get_running_loop()
@@ -155,7 +198,7 @@ async def stream_dfd(
 
         async def work():
             try:
-                result= await _analyse_repository(admission.owner, admission.repo, group_by, progress)
+                result= await _analyse_repository(admission.owner, admission.repo, group_by, progress, token)
                 guard.cache.set(admission.key, result)
                 final.append(_result_event(result))
             except (GitHubError, httpx.HTTPError) as error:

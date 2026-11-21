@@ -85,6 +85,14 @@ async def get_current_user(claims: dict= Depends(current_claims), session: Async
     return await find_or_create_user(claims, session)
 
 
+async def optional_user(
+    credentials: HTTPAuthorizationCredentials | None= Depends(bearer), session: AsyncSession= Depends(get_session)
+) -> User | None:
+    if credentials is None:
+        return None
+    return await find_or_create_user(await current_claims(credentials), session)
+
+
 async def find_or_create_user(claims: dict, session: AsyncSession) -> User:
     sub= claims["sub"]
     user= await session.scalar(select(User).where(User.keycloak_sub== sub))
