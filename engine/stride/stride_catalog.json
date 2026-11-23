@@ -100,7 +100,9 @@
         "OWASP pytm AA01",
         "CWE-287",
         "CAPEC-115"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-S-02",
@@ -118,7 +120,9 @@
         "OWASP pytm CR01",
         "CWE-290",
         "CAPEC-115"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-S-03",
@@ -136,7 +140,9 @@
         "OWASP pytm CR01",
         "CWE-384",
         "CAPEC-61"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-S-04",
@@ -154,7 +160,9 @@
         "OWASP pytm AA01",
         "CWE-290",
         "CAPEC-115"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-S-05",
@@ -171,7 +179,9 @@
       "references": [
         "CWE-601",
         "CAPEC-383"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-S-06",
@@ -189,7 +199,9 @@
         "OWASP API8:2023",
         "CWE-942",
         "CAPEC-63"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-T-01",
@@ -207,7 +219,9 @@
         "OWASP pytm CR01",
         "CWE-319",
         "CAPEC-94"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-T-02",
@@ -227,7 +241,9 @@
         "CWE-20",
         "CWE-89",
         "CAPEC-66"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-T-03",
@@ -245,7 +261,9 @@
         "OWASP pytm INP02",
         "CWE-120",
         "CAPEC-100"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-T-04",
@@ -263,7 +281,9 @@
         "OWASP pytm DS02",
         "CWE-284",
         "CAPEC-1"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-T-05",
@@ -282,7 +302,9 @@
         "OWASP pytm CR01",
         "CWE-319",
         "CAPEC-94"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-T-06",
@@ -300,7 +322,9 @@
         "OWASP Top 10 A08:2021",
         "CWE-502",
         "CAPEC-586"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-T-07",
@@ -318,7 +342,9 @@
         "OWASP ASVS V13",
         "CWE-345",
         "CAPEC-220"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-R-01",
@@ -336,7 +362,9 @@
         "OWASP pytm AC03",
         "CWE-778",
         "CAPEC-93"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-R-02",
@@ -353,7 +381,9 @@
       "references": [
         "CWE-779",
         "CAPEC-81"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-R-03",
@@ -371,7 +401,9 @@
         "OWASP pytm AC03",
         "CWE-778",
         "CAPEC-93"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-I-01",
@@ -389,7 +421,9 @@
         "OWASP pytm CR01",
         "CWE-319",
         "CAPEC-94"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-I-02",
@@ -407,7 +441,9 @@
         "OWASP pytm DS01",
         "CWE-311",
         "CAPEC-37"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-I-03",
@@ -429,7 +465,9 @@
       "references": [
         "OWASP pytm CR01",
         "CWE-319"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-I-04",
@@ -447,7 +485,9 @@
         "OWASP pytm DS04",
         "CWE-532",
         "CAPEC-215"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-I-05",
@@ -465,7 +505,9 @@
         "OWASP Top 10 A05:2021",
         "CWE-209",
         "CAPEC-215"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-I-06",
@@ -483,7 +525,9 @@
         "OWASP pytm CR02",
         "CWE-798",
         "CAPEC-37"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-I-07",
@@ -502,7 +546,9 @@
         "OWASP API7:2023",
         "CWE-918",
         "CAPEC-664"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-I-08",
@@ -520,7 +566,9 @@
         "CWE-22",
         "OWASP Top 10 A01:2021",
         "CAPEC-126"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-D-01",
@@ -538,7 +586,9 @@
         "OWASP pytm DO01",
         "CWE-400",
         "CAPEC-130"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-D-02",
@@ -556,7 +606,9 @@
         "OWASP pytm DO02",
         "CWE-400",
         "CAPEC-130"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-D-03",
@@ -573,7 +625,9 @@
       "references": [
         "OWASP pytm DO03",
         "CWE-400"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Low"
     },
     {
       "id": "STRIDE-D-04",
@@ -590,7 +644,9 @@
       "references": [
         "OWASP pytm DS01",
         "CWE-400"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-E-01",
@@ -608,7 +664,9 @@
         "OWASP pytm AC01",
         "CWE-250",
         "CAPEC-122"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-E-02",
@@ -626,7 +684,9 @@
         "OWASP pytm AC02",
         "CWE-285",
         "CAPEC-122"
-      ]
+      ],
+      "finding_type": "architectural_hardening",
+      "default_confidence": "Medium"
     },
     {
       "id": "STRIDE-E-03",
@@ -644,7 +704,9 @@
         "OWASP pytm INP05",
         "CWE-78",
         "CAPEC-88"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-E-04",
@@ -662,7 +724,9 @@
         "OWASP API1:2023",
         "CWE-639",
         "CAPEC-122"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-E-05",
@@ -680,7 +744,9 @@
         "OWASP API3:2023",
         "CWE-915",
         "CAPEC-360"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     },
     {
       "id": "STRIDE-E-06",
@@ -698,7 +764,9 @@
         "OWASP Top 10 A04:2021",
         "CWE-434",
         "CAPEC-650"
-      ]
+      ],
+      "finding_type": "vulnerability",
+      "default_confidence": "High"
     }
   ]
 }

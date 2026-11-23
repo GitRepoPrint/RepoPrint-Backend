@@ -916,5 +916,249 @@ def test_action1_anonymous_browser_client_exempt_from_mtls():
     assert "STRIDE-S-02" not in threat_ids
 
 
+def test_action2_triage_vulnerabilities_vs_recommendations():
+    """Action 2: Verify that findings are cleanly segregated into actionable vulnerabilities and architectural recommendations."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/triage-app",
+        "nodes": [
+            {
+                "id": "process:app/api",
+                "kind": "process",
+                "name": "API Service",
+                "extra": {"route_count": 1},
+            }
+        ],
+        "edges": [],
+    }
+    result = engine.analyze(dfd)
+    assert "actionable_vulnerabilities" in result
+    assert "architectural_recommendations" in result
+    assert "summary_by_type" in result
+    assert result["summary_by_type"]["vulnerability"] == len(result["actionable_vulnerabilities"])
+    assert result["summary_by_type"]["architectural_hardening"] == len(result["architectural_recommendations"])
+    assert result["total_findings"] == len(result["actionable_vulnerabilities"]) + len(result["architectural_recommendations"])
+
+    # Check actionable contains code vulnerabilities (e.g. STRIDE-S-01, STRIDE-T-02)
+    actionable_ids = [f["threat_id"] for f in result["actionable_vulnerabilities"]]
+    assert "STRIDE-S-01" in actionable_ids  # Unauthenticated API
+    assert "STRIDE-T-02" in actionable_ids  # Input injection
+
+    # Check recommendations contains hardening guidelines (e.g. STRIDE-E-01 PoLP, STRIDE-R-01 Logging)
+    rec_ids = [f["threat_id"] for f in result["architectural_recommendations"]]
+    assert "STRIDE-E-01" in rec_ids
+    assert "STRIDE-R-01" in rec_ids
+
+
+def test_action2_disable_recommendations_mode():
+    """Action 2: Verify that StrideEngine(include_recommendations=False) yields only actionable vulnerabilities."""
+    engine = StrideEngine(include_recommendations=False)
+    dfd = {
+        "repository": "test/actionable-only",
+        "nodes": [
+            {
+                "id": "process:app/api",
+                "kind": "process",
+                "name": "API Service",
+                "extra": {"route_count": 1},
+            }
+        ],
+        "edges": [],
+    }
+    result = engine.analyze(dfd)
+    # Total findings in primary findings list should only include actionable vulnerabilities
+    assert result["total_findings"] == result["actionable_vulnerabilities_count"]
+    for f in result["findings"]:
+        assert f["finding_type"] == "vulnerability"
+
+
+def test_action2_confidence_ratings_on_findings():
+    """Action 2: Verify that findings include confidence scores (High, Medium, Low)."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/confidence-ratings",
+        "nodes": [
+            {
+                "id": "process:app/api",
+                "kind": "process",
+                "name": "API Service",
+                "extra": {"route_count": 1},
+            }
+        ],
+        "edges": [],
+    }
+    result = engine.analyze(dfd)
+    assert "summary_by_confidence" in result
+    assert result["summary_by_confidence"]["High"] > 0
+    assert result["summary_by_confidence"]["Medium"] > 0
+    for f in result["findings"]:
+        assert f["confidence"] in ("High", "Medium", "Low")
+
+
+def test_action3_embedded_sqlite_dataflow_exempt_from_network_rules():
+    """Action 3: Verify that flows connecting a process to an embedded SQLite datastore do not fire network rules."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/embedded-sqlite-flow",
+        "nodes": [
+            {
+                "id": "process:app",
+                "kind": "process",
+                "name": "App Process",
+                "extra": {"route_count": 1},
+            },
+            {
+                "id": "data_store:sqlite",
+                "kind": "data_store",
+                "name": "SQLite DB",
+                "technology": "sqlite",
+            },
+        ],
+        "edges": [
+            {
+                "id": "flow_sqlite",
+                "source": "process:app",
+                "target": "data_store:sqlite",
+                "label": "accesses",
+            }
+        ],
+    }
+    result = engine.analyze(dfd)
+    flow_threats = [f["threat_id"] for f in result["findings"] if f.get("component_id") == "flow_sqlite"]
+    # Local SQLite disk I/O must NOT trigger network rules
+    assert "STRIDE-T-01" not in flow_threats
+    assert "STRIDE-I-01" not in flow_threats
+    assert "STRIDE-S-02" not in flow_threats
+    assert "STRIDE-D-02" not in flow_threats
+
+
+def test_action3_public_cdn_exempt_from_mtls():
+    """Action 3: Verify that fetching scripts from public CDNs does not trigger STRIDE-S-02 (mTLS)."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/cdn-flow",
+        "nodes": [
+            {
+                "id": "process:app",
+                "kind": "process",
+                "name": "App Process",
+                "extra": {"route_count": 1},
+            },
+            {
+                "id": "external_entity:cdnjs.cloudflare.com",
+                "kind": "external_entity",
+                "name": "Cloudflare CDN",
+                "tags": ["cdn", "public_asset"],
+            },
+        ],
+        "edges": [
+            {
+                "id": "flow_cdn",
+                "source": "process:app",
+                "target": "external_entity:cdnjs.cloudflare.com",
+                "label": "loads script",
+                "protocol": "HTTP",
+                "is_encrypted": False,
+            }
+        ],
+    }
+    result = engine.analyze(dfd)
+    flow_threats = [f["threat_id"] for f in result["findings"] if f.get("component_id") == "flow_cdn"]
+    # Standard unencrypted HTTP alerts still fire
+    assert "STRIDE-T-01" in flow_threats
+    assert "STRIDE-I-01" in flow_threats
+    # Mutual authentication (mTLS) does NOT fire for public CDN
+    assert "STRIDE-S-02" not in flow_threats
+
+
+def test_action3_duplicate_template_ingress_deduplication():
+    """Action 3: Verify that duplicate client ingress flows to template subdirectories are collapsed."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/duplicate-ingress",
+        "nodes": [
+            {
+                "id": "external_entity:client",
+                "kind": "external_entity",
+                "name": "Web Client",
+            },
+            {
+                "id": "process:app",
+                "kind": "process",
+                "name": "Web App",
+                "extra": {"route_count": 1},
+            },
+            {
+                "id": "process:app/templates/login",
+                "kind": "process",
+                "name": "Login Template",
+                "extra": {"route_count": 0},
+            },
+        ],
+        "edges": [
+            {
+                "id": "flow_app",
+                "source": "external_entity:client",
+                "target": "process:app",
+                "label": "HTTP requests",
+                "protocol": "HTTP",
+                "is_encrypted": False,
+            },
+            {
+                "id": "flow_template",
+                "source": "external_entity:client",
+                "target": "process:app/templates/login",
+                "label": "submits form",
+                "protocol": "HTTP",
+                "is_encrypted": False,
+            },
+        ],
+    }
+    result = engine.analyze(dfd)
+    # The parent flow must be evaluated
+    app_threats = [f["threat_id"] for f in result["findings"] if f.get("component_id") == "flow_app"]
+    assert "STRIDE-T-01" in app_threats
+    assert "STRIDE-I-01" in app_threats
+
+    # The template subpath ingress must be deduplicated
+    template_threats = [f["threat_id"] for f in result["findings"] if f.get("component_id") == "flow_template"]
+    assert len(template_threats) == 0
+
+
+def test_action3_passive_library_docstring_urls_exempt():
+    """Action 3: Verify that URLs in docstrings of passive library modules do not fire network daemon alerts."""
+    engine = StrideEngine()
+    dfd = {
+        "repository": "test/library-docstrings",
+        "nodes": [
+            {
+                "id": "process:src/core_lib",
+                "kind": "process",
+                "name": "Core Lib",
+                "file_path": "src/core_lib/utils.py",
+                "extra": {"files": ["src/core_lib/utils.py"], "route_count": 0},
+            },
+            {
+                "id": "external_entity:docs.example.com",
+                "kind": "external_entity",
+                "name": "Documentation Site",
+            },
+        ],
+        "edges": [
+            {
+                "id": "flow_doc",
+                "source": "process:src/core_lib",
+                "target": "external_entity:docs.example.com",
+                "label": "calls",
+            }
+        ],
+    }
+    result = engine.analyze(dfd)
+    doc_threats = [f["threat_id"] for f in result["findings"] if f.get("component_id") == "flow_doc"]
+    assert len(doc_threats) == 0
+
+
+
+
 
 

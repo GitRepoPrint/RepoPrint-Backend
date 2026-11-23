@@ -21,6 +21,7 @@ class StrideEngine:
         self,
         catalog_path: str | Path | None = None,
         filter_auxiliary_components: bool = True,
+        include_recommendations: bool = True,
     ) -> None:
         if catalog_path is None:
             catalog_path = Path(__file__).parent / "stride_catalog.json"
@@ -35,6 +36,7 @@ class StrideEngine:
         self.dfd_properties: dict[str, str] = catalog.get("dfd_properties", {})
         self.rules: list[dict[str, Any]] = catalog.get("rules", [])
         self.filter_auxiliary_components = filter_auxiliary_components
+        self.include_recommendations = include_recommendations
 
     def analyze(self, dfd: dict[str, Any]) -> dict[str, Any]:
         """Analyze a DFD JSON structure and return detected STRIDE threats."""
@@ -64,6 +66,10 @@ class StrideEngine:
         # 2. Evaluate flow rules (data_flow)
         for flow in data_flows:
             if self.filter_auxiliary_components and self._is_flow_connected_to_auxiliary(flow, context):
+                continue
+
+            # Action 3: Collapse duplicate client ingress flows into template subcomponents
+            if self._is_flow_duplicate_ingress(flow, context):
                 continue
 
             flow_props = self._extract_properties(flow)
@@ -96,6 +102,23 @@ class StrideEngine:
             if comp_id and cat and cat not in stride_matrix[comp_id]:
                 stride_matrix[comp_id].append(cat)
 
+        # Action 2: Triage findings into Actionable Vulnerabilities vs Architectural Recommendations
+        actionable_vulnerabilities = [f for f in findings if f.get("finding_type") == "vulnerability"]
+        architectural_recommendations = [f for f in findings if f.get("finding_type") == "architectural_hardening"]
+
+        summary_by_type = {
+            "vulnerability": len(actionable_vulnerabilities),
+            "architectural_hardening": len(architectural_recommendations),
+        }
+        summary_by_confidence = {
+            "High": sum(1 for f in findings if f.get("confidence") == "High"),
+            "Medium": sum(1 for f in findings if f.get("confidence") == "Medium"),
+            "Low": sum(1 for f in findings if f.get("confidence") == "Low"),
+        }
+
+        # If user explicitly disabled recommendations, report only actionable vulnerabilities
+        active_findings = findings if self.include_recommendations else actionable_vulnerabilities
+
         repo = dfd.get("repository", "unknown")
         if isinstance(repo, dict):
             repo_name = f"{repo.get('owner', '')}/{repo.get('repo', '')}" if repo.get("owner") else repo.get("repo", "unknown")
@@ -104,11 +127,17 @@ class StrideEngine:
 
         return {
             "repository": repo_name,
-            "total_findings": len(findings),
+            "total_findings": len(active_findings),
+            "actionable_vulnerabilities_count": len(actionable_vulnerabilities),
+            "architectural_recommendations_count": len(architectural_recommendations),
             "summary_by_category": summary_by_category,
             "summary_by_severity": summary_by_severity,
+            "summary_by_type": summary_by_type,
+            "summary_by_confidence": summary_by_confidence,
             "stride_matrix": dict(stride_matrix),
-            "findings": findings,
+            "findings": active_findings,
+            "actionable_vulnerabilities": actionable_vulnerabilities,
+            "architectural_recommendations": architectural_recommendations,
         }
 
     def _build_graph_context(
@@ -294,6 +323,18 @@ class StrideEngine:
 
         return True
 
+    def _is_flow_duplicate_ingress(self, flow: dict[str, Any], context: dict[str, Any]) -> bool:
+        """Collapse duplicate ingress flows from external client into template subcomponents."""
+        src_id = str(flow.get("source", ""))
+        tgt_id = str(flow.get("target", ""))
+        if src_id == "external_entity:client" and "/templates" in tgt_id:
+            parent_id = tgt_id.split("/templates")[0]
+            # Check if there is already an ingress flow from the same source to the parent application
+            for pf in context.get("inbound", {}).get(parent_id, []):
+                if pf.get("source") == src_id:
+                    return True
+        return False
+
     def _is_rule_applicable_to_flow(
         self,
         rule: dict[str, Any],
@@ -301,9 +342,72 @@ class StrideEngine:
         flow_props: dict[str, Any],
         context: dict[str, Any],
     ) -> bool:
-        """Filter network flow rules so that in-memory code imports are not falsely flagged."""
+        """Filter network flow rules so that in-memory code imports and local disk I/O are not falsely flagged."""
         rid = rule.get("id", "")
         conditions = rule.get("conditions", {})
+
+        label = str(flow.get("label") or flow.get("name") or "").lower()
+        src_id = str(flow.get("source", ""))
+        tgt_id = str(flow.get("target", ""))
+        protocol = flow.get("protocol")
+        elem_by_id = context.get("elem_by_id", {})
+        src_elem = elem_by_id.get(src_id, {})
+        tgt_elem = elem_by_id.get(tgt_id, {})
+
+        network_rules = {
+            "STRIDE-S-02",  # Missing Mutual Authentication on Data Flow
+            "STRIDE-T-01",  # Unencrypted Dataflow in Transit
+            "STRIDE-T-05",  # Insecure Trust Boundary Crossing without Transport Encryption
+            "STRIDE-I-01",  # Cleartext Sensitive Data in Transit
+            "STRIDE-I-03",  # Insecure Protocol Usage
+            "STRIDE-D-02",  # Missing Connection Timeout Configuration
+        }
+
+        # Action 3: Embedded / Local file datastores (SQLite, DuckDB, file-storage)
+        # Flows to local datastores without explicit network protocol are local disk I/O, not network sockets
+        datastore_elem = None
+        if src_id.startswith("data_store:") or src_elem.get("type") == "data_store":
+            datastore_elem = src_elem
+        elif tgt_id.startswith("data_store:") or tgt_elem.get("type") == "data_store":
+            datastore_elem = tgt_elem
+
+        if datastore_elem:
+            ds_tech = str(datastore_elem.get("technology") or "").lower()
+            ds_id = str(datastore_elem.get("id") or "").lower()
+            is_embedded_ds = (
+                any(t in ds_tech for t in ["sqlite", "duckdb", "file-storage", "local_file", "disk", "sqlite3"])
+                or any(t in ds_id for t in ["sqlite", "file-storage"])
+            )
+            if is_embedded_ds and (not protocol or str(protocol).lower() not in ["http", "https", "tcp", "sql", "grpc"]):
+                if rid in network_rules:
+                    return False
+
+        # Action 3: Passive library docstring URL references (e.g. documentation links in comments/docstrings)
+        src_extra = src_elem.get("extra", {}) if isinstance(src_elem.get("extra"), dict) else {}
+        src_path = str(src_elem.get("file_path") or src_elem.get("path") or src_id)
+        src_routes = src_extra.get("routes", [])
+        src_route_count = src_elem.get("route_count", len(src_routes))
+        src_is_library = (
+            ("files" in src_extra or src_path.startswith(("src/", "lib/")))
+            and src_route_count == 0
+            and not any(f.get("source", "").startswith("external_entity:client") for f in context.get("inbound", {}).get(src_id, []))
+            and not any("main" in str(d).lower() for d in src_extra.get("definitions", []))
+        )
+        if src_is_library and tgt_id.startswith("external_entity:") and not protocol:
+            return False
+
+        # Action 1 & Action 3: Public web browser client and public CDN mTLS exemptions
+        if rid == "STRIDE-S-02":
+            if src_id == "external_entity:client" and label in ["submits form", "http requests"]:
+                return False
+            tgt_name = str(tgt_elem.get("name") or tgt_id).lower()
+            is_public_cdn = (
+                any(cdn in tgt_name for cdn in ["unpkg", "jquery", "cdnjs", "jsdelivr", "googleapis", "gstatic", "cloudflare", "bootstrapcdn", "cdn."])
+                or any(kw in label for kw in ["loads script", "loads stylesheet", "static_asset", "public_asset"])
+                or any(t in tgt_elem.get("tags", []) for t in ["cdn", "public_asset", "static_resource"])
+            )
+            if is_public_cdn:
+                return False
 
         # If a property is explicitly declared with a boolean, always evaluate
         has_explicit_prop = any(
@@ -313,11 +417,6 @@ class StrideEngine:
         )
         if has_explicit_prop:
             return True
-
-        label = str(flow.get("label") or flow.get("name") or "").lower()
-        src_id = str(flow.get("source", ""))
-        tgt_id = str(flow.get("target", ""))
-        protocol = flow.get("protocol")
 
         is_network = (
             protocol is not None
@@ -331,20 +430,7 @@ class StrideEngine:
             or (not label and not src_id.startswith("process:") and not tgt_id.startswith("process:"))
         )
 
-        network_rules = {
-            "STRIDE-S-02",  # Missing Mutual Authentication on Data Flow
-            "STRIDE-T-01",  # Unencrypted Dataflow in Transit
-            "STRIDE-T-05",  # Insecure Trust Boundary Crossing without Transport Encryption
-            "STRIDE-I-01",  # Cleartext Sensitive Data in Transit
-            "STRIDE-I-03",  # Insecure Protocol Usage
-            "STRIDE-D-02",  # Missing Connection Timeout Configuration
-        }
-
         if rid in network_rules and not is_network:
-            return False
-
-        # Action 1: Public web browser clients accessing web endpoints do not present mTLS client certificates
-        if rid == "STRIDE-S-02" and src_id == "external_entity:client" and label in ["submits form", "http requests"]:
             return False
 
         return True
@@ -450,13 +536,18 @@ class StrideEngine:
         return True
 
     def _create_finding(self, rule: dict[str, Any], component: dict[str, Any], is_flow: bool) -> dict[str, Any]:
-        """Format an identified threat finding."""
+        """Format an identified threat finding with triage type and confidence score."""
+        finding_type = rule.get("finding_type", "vulnerability")
+        confidence = rule.get("default_confidence", "High")
+
         finding: dict[str, Any] = {
             "threat_id": rule["id"],
             "category": rule["category"],
             "stride_letter": rule.get("stride_letter", ""),
             "severity": rule["severity"],
             "target_type": rule["applies_to"],
+            "finding_type": finding_type,
+            "confidence": confidence,
             "component_id": component.get("id"),
             "component_name": component.get("name", component.get("id")),
             "title": rule["title"],
