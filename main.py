@@ -19,10 +19,10 @@ def create_app() -> FastAPI:
     )
     app.state.guard = DfdGuard.from_settings(settings)
     app.include_router(github.router)
-    app.include_router(dfd.router)
     app.include_router(health.router)
     app.include_router(me.router)
     app.include_router(repositories.router)
+    app.include_router(dfd.router)
 
     @app.get("/health")
     async def root():
