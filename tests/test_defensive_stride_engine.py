@@ -1,6 +1,6 @@
 """Unit tests for the STRIDE Threat Modeling Engine."""
 
-from engine.stride.defensive_stride_engine import StrideEngine
+from app.engines.stride.defensive_stride_engine import StrideEngine
 
 
 def test_engine_initialization():

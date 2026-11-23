@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import dfd, github, health, me, repositories
+from app.routers import dfd, github, health, me, repositories, stride
 from app.services.guard import DfdGuard
 
 
@@ -23,6 +23,7 @@ def create_app() -> FastAPI:
     app.include_router(me.router)
     app.include_router(repositories.router)
     app.include_router(dfd.router)
+    app.include_router(stride.router)
 
     @app.get("/health")
     async def root():
