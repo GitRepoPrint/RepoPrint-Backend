@@ -1,484 +1,928 @@
 {
-"categories": {
-    "linkability": "Linkability",
-    "identifiability": "Identifiability",
+  "categories": {
+    "linking": "Linking",
+    "identifying": "Identifying",
     "non_repudiation": "Non-repudiation",
-    "detectability": "Detectability",
-    "disclosure_of_information": "Disclosure of information",
-    "unawareness": "Unawareness",
+    "detecting": "Detecting",
+    "data_disclosure": "Data disclosure",
+    "unawareness_unintervenability": "Unawareness and unintervenability",
     "non_compliance": "Non-compliance"
   },
-  
-"dfd_properties": {
-    "handlesCardPayment": "Card payment",
-    "isALog": "Is a Log",
-    "isEncrypted": "Encrypted",
-    "isSigned": "Signed",
-    "isWebApplication": "Web Application",
-    "providesAuthentication": "Provides Authentication",
-    "publicNetwork": "Public Network",
-    "storesCredentials": "Stores Credentials"
-},
-
-"data_types": [
-    "direct_identifier",
-    "pseudo_identifier",
-    "credential",
-    "general_data"
-  ],
-  
-"rules": [
+  "rules": [
     {
       "id": "L1",
-      "category": "Linkability",
+      "category": "Linking",
       "applies_to": "data_flow",
-      "severity": "High",
       "conditions": {
         "direction": "inbound",
         "data_type": "direct_identifier",
         "is_pseudonymized": false
       },
-      "title": "Linked user requests",
-      "description": "User requests can be linked because they contain a unique identifier across sessions or services.",
-      "gdpr_articles": ["Art. 5(1)(c)", "Art. 25"],
-      "mitigation": "Use scoped, rotating pseudonyms or session-specific tokens instead of global identifiers."
+      "title": "Linked User Requests",
+      "hotspot": "Inbound User With Personal Data",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "User requests can be linked because they contain a unique identifier.",
+      "elicitation_questions": [
+        "Is there an identifier (unique in system/session) or dataset?",
+        "Is there other data associated with that identifier?",
+        "Is there previous data with the same identifier to which new data can be linked?"
+      ],
+      "consequences": [
+        "Unique identifiers facilitate the linking of new data items to a user profile, accumulating growing amounts of personal data associated with this profile. This can later lead to \u2018Identifying\u2019 threats."
+      ],
+      "examples": [
+        "be linked? \u0011 Using an email address as an identifier enables the linking of all activities to the same individual, even across multiple services.",
+        "\u0011 An IP address can be used to link multiple visits to the same individual.",
+        "\u0011 All product views in a web shop are linked to the same user because they are logged in."
+      ],
+      "additional_info": "Linking is especially easy for authenticated users, as all requests in the same session are linked."
     },
     {
       "id": "L2",
-      "category": "Linkability",
+      "category": "Linking",
       "applies_to": "data_flow",
-      "severity": "Medium",
       "conditions": {
         "direction": "inbound",
         "data_type": "pseudo_identifier"
       },
-      "title": "Linkable user requests",
-      "description": "User requests contain attributes that can be combined into quasi-identifiers (e.g. fingerprints, locations).",
-      "gdpr_articles": ["Art. 4(1)", "Art. 25"],
-      "mitigation": "Minimize metadata transmission, generalize timestamps, and restrict client fingerprinting attributes."
+      "title": "Linkable User Requests",
+      "hotspot": "Inbound Personal Data",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "User requests can be linked because they contain attributes that can be combined into quasi-identifiers.",
+      "elicitation_questions": [
+        "Is there a set of attributes that can serve as an identifier?",
+        "Is there other data sent together with that quasi-identifier?",
+        "Is there existing data to link it to?"
+      ],
+      "consequences": [
+        ". . ) that together are unique to a websi",
+        "The use of quasi-identifiers enables the linking of new data items to a user profile to gather increasing amounts of personal data, even without unique identifiers."
+      ],
+      "examples": [
+        "\u0011 A small set of locations can be used to uniquely link activity to a single user.",
+        "\u0011 A subset of attributes may be su\ufb03cient to uniquely link data to a particular individual.",
+        "\u0011 A browser fingerprint combines properties (OS, browser, display size,."
+      ],
+      "additional_info": "Many requests contain a lot of different properties that, when combined, are unique to an individual."
     },
     {
       "id": "L3",
-      "category": "Linkability",
+      "category": "Linking",
       "applies_to": "data_flow",
-      "severity": "Low",
       "conditions": {
         "direction": "inbound",
         "has_distinguishable_patterns": true
       },
-      "title": "Linking through distinguishable patterns",
-      "description": "Patterns in request metadata, timing, or payload structure allow linking distinct requests to one user.",
-      "gdpr_articles": ["Art. 25"],
-      "mitigation": "Introduce message padding, batch requests, or randomize dispatch intervals."
+      "title": "Linking Through Distinguishable Patterns",
+      "hotspot": "Inbound User",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "Patterns in the (meta)data contained in user requests can be used to link them to each other.",
+      "elicitation_questions": [
+        "Is the data from different individuals distinguishable?",
+        "Is it possible to query data using distinguishable attributes?"
+      ],
+      "consequences": [
+        "When users are distinguishable from one another, user profiles can be constructed to collect growing amounts of personal data associated with each profile. This can later lead to \u2018Identifying\u2019 threats."
+      ],
+      "examples": [
+        "\u0011 Unique timing patterns could be recognized to link the use of a service to the same user.",
+        "\u0011 Messages can be analyzed for patterns (e.g., writing style, timing) to link them to the same user."
+      ],
+      "additional_info": "Even data without clear attributes could contain patterns to allow distinguishing between different individuals."
     },
     {
       "id": "L4",
-      "category": "Linkability",
+      "category": "Linking",
       "applies_to": "data_store",
-      "severity": "High",
       "conditions": {
         "stores_raw_data": true,
         "contains_pseudo_identifiers": true
       },
-      "title": "Linkable dataset",
-      "description": "Stored personal or activity data contains fine-grained attributes that enable cross-record correlation.",
-      "gdpr_articles": ["Art. 5(1)(c)", "Art. 6(4)"],
-      "mitigation": "Apply k-anonymity, differential privacy, or aggregate historical entries."
+      "title": "Linkable Dataset",
+      "hotspot": "Storing/Retrieving",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "Stored personal data can be linked to individuals.",
+      "elicitation_questions": [
+        "Is there a set of attributes that can serve as an identifier?",
+        "Is there other data sent together with that quasi-identifier?",
+        "Is there existing data to link it to?"
+      ],
+      "consequences": [
+        "The use of quasi-identifiers enables the linking of new data items to a user profile to gather increasing amounts of personal data, even without unique identifiers."
+      ],
+      "examples": [
+        "\u0011 Fine-grained raw data is stored that enables linking specific entries to individuals.",
+        "\u0011 Querying the average salary with a strict set of criteria can reveal the salary of an individual employee.",
+        "\u0011 Patterns in a person\u2019s writing style can be used to link multiple texts written by the same person."
+      ],
+      "additional_info": "Many requests contain a lot of different properties that, when combined, are unique to an individual."
     },
     {
       "id": "L5",
-      "category": "Linkability",
+      "category": "Linking",
       "applies_to": "process",
-      "severity": "Medium",
       "conditions": {
         "derives_patterns": true,
         "builds_user_profiles": true
       },
-      "title": "Profiling users",
-      "description": "Analyzing data points for behavioral or emotional patterns to link actions and construct profiles.",
-      "gdpr_articles": ["Art. 21", "Art. 22"],
-      "mitigation": "Enforce explicit consent for profiling, provide opt-outs, and decouple analytical profiles from raw IDs."
+      "title": "Profiling Users",
+      "hotspot": "Processing",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "Users can be profiled by analyzing their data for patterns.",
+      "elicitation_questions": [
+        "Are there patterns derivable from the data?",
+        "Can (new) personal data be inferred from the linked data points?"
+      ],
+      "consequences": [
+        "Deriving patterns from the data can facilitate the linking of data that was not intended to be linked.",
+        "Timing patterns of messages can be used to link requests to construct profiles."
+      ],
+      "examples": [
+        "\u0011 By applying sentiment analysis to faces in pictures, the emotional state of an individual can be derived.",
+        "\u0011 The frequency of data exchanges from a health monitoring device allows an adversary to infer a patient\u2019s medical condition."
+      ],
+      "additional_info": "The more data is collected and the more detailed it is, the easier it can become to discern patterns for linking."
     },
     {
       "id": "I1",
-      "category": "Identifiability",
+      "category": "Identifying",
       "applies_to": "data_flow",
-      "severity": "High",
       "conditions": {
         "direction": "inbound",
         "data_type": "direct_identifier"
       },
-      "title": "Identified user requests",
-      "description": "Incoming user requests contain explicit identity data (e.g. full name, email, credentials).",
-      "gdpr_articles": ["Art. 5(1)(c)", "Art. 25"],
-      "mitigation": "Avoid requesting direct identity data when pseudonymous authentication or zero-knowledge proofs suffice."
+      "title": "Identified User Requests",
+      "hotspot": "Inbound User With Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "The incoming user requests contain data that directly reveals the user identity.",
+      "elicitation_questions": [
+        "Does data sent to the system (potentially) contain identity data?"
+      ],
+      "consequences": [
+        "Identified data can severely amplify the impact of a future data breach.",
+        "Depending on the context, the identity may reveal very sensitive attributes (e.g., health records)."
+      ],
+      "examples": [
+        "\u0011 An online service requests full name and address during the registration process.",
+        "\u0011 The username for a service contains identity data (e.g., \u201cfirstname.lastname\u201d)."
+      ],
+      "additional_info": "Users often need to provide identified data even when not essential for the functionality. Identified data requires stronger security measures."
     },
     {
       "id": "I2",
-      "category": "Identifiability",
+      "category": "Identifying",
       "applies_to": "data_flow",
-      "severity": "Medium",
       "conditions": {
         "direction": "inbound",
         "contains_inferable_identity": true
       },
-      "title": "Identifiable user requests",
-      "description": "Requests do not carry names but contain behavior or contextual attributes sufficiently unique to infer identity.",
-      "gdpr_articles": ["Art. 4(1)"],
-      "mitigation": "Generalize input parameters, coarsen location coordinates, and redact granular search parameters."
+      "title": "Identifiable User Requests",
+      "hotspot": "Inbound User",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "The user can be identified because the data in their requests can be used to infer who they are.",
+      "elicitation_questions": [
+        "Are requests or records su\ufb03ciently unique to differentiate them from those of a specific individual?"
+      ],
+      "consequences": [
+        "Even without identity information, user actions or data may be very specific and unintentionally reveal the identity."
+      ],
+      "examples": [
+        "those of a specific individual? \u0011 User search queries, such as looking up nearby businesses or info about a rare illness, can be highly specific and may lead to identification.",
+        "\u0011 A person\u2019s consistent access at a particular time each week could link their visits even when they are not logged into their account."
+      ],
+      "additional_info": "The likelihood depends on how distinguishable an individual is from others."
     },
     {
       "id": "I3",
-      "category": "Identifiability",
+      "category": "Identifying",
       "applies_to": "data_flow",
-      "severity": "Medium",
       "conditions": {
         "direction": "inbound",
         "accepts_free_form_text": true
       },
-      "title": "Identifiable data flows",
-      "description": "Free-form or unconstrained user data (e.g. feedback, crash traces) contains accidentally submitted identifiers.",
-      "gdpr_articles": ["Art. 25"],
-      "mitigation": "Implement automated regex or NER filtering to scrub personal attributes before payload ingestion."
+      "title": "Identifiable Data Flows",
+      "hotspot": "Inbound Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Data sent to the system is su\ufb03ciently revealing to identify the user.",
+      "elicitation_questions": [
+        "Is there free-form user provided data that is received or processed by the system?",
+        "Is data collected that may reveal the identifying information?"
+      ],
+      "consequences": [
+        "Inadvertently providing identifiable attributes in user-submitted data can lead to the unintentional identification of the individual."
+      ],
+      "examples": [
+        "\u0011 When an individual shares detailed data (such as location, employer, device type, etc.) in a feedback form, the provided information may be revealing enough to uniquely identify that person."
+      ],
+      "additional_info": "The data subject is not necessarily the source of the provided data."
     },
     {
       "id": "I4",
-      "category": "Identifiability",
+      "category": "Identifying",
       "applies_to": "data_flow",
-      "severity": "High",
       "conditions": {
         "direction": "inbound",
         "recycles_global_identifiers": true
       },
-      "title": "Identifiers in data requests",
-      "description": "Communication reuses universal identifiers across distinct third-party API queries or outbound calls.",
-      "gdpr_articles": ["Art. 5(1)(c)"],
-      "mitigation": "Generate independent, transient tokens tailored strictly per external integration endpoint."
+      "title": "Identifiers In Data Requests",
+      "hotspot": "Inbound User With Personal Data",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "Communication contains (quasi-)identifiers.",
+      "elicitation_questions": [
+        "Is there a distinctive identifier used during interactions or when referring to an individual\u2019s data?",
+        "Can multiple attributes be combined to create a unique reference to an individual or their data?"
+      ],
+      "consequences": [
+        "Pseudonyms facilitate the aggregation of data on the same individual (see linking). Storing a substantial amount of data increases the possibility of identifying the individual behind it."
+      ],
+      "examples": [
+        "individual or their data? \u0011 The (re)use of an email address facilitates easy combination with other data, leading to the identification of the individual.",
+        "\u0011 IP addresses in communication can be used to uniquely identify an individual.",
+        "\u0011 Browser fingerprinting entails the combination of various properties to create a unique identifier, serving as a pseudonym for the user."
+      ],
+      "additional_info": "Identifying individuals through identifiers is easy when these identifiers are reused across multiple services or in publicly available data."
     },
     {
       "id": "I5",
-      "category": "Identifiability",
+      "category": "Identifying",
       "applies_to": "data_store",
-      "severity": "High",
       "conditions": {
         "contains_quasi_identifiers": true,
         "re_identification_risk": true
       },
-      "title": "Identifiable dataset",
-      "description": "Stored records contain combined demographic, operational, or location attributes that allow re-identification.",
-      "gdpr_articles": ["Art. 4(1)", "Art. 32"],
-      "mitigation": "Apply l-diversity, t-closeness, or noise injection to stored analytical tables."
+      "title": "Identifiable Dataset",
+      "hotspot": "Storage",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "Stored data can be used to identify individuals.",
+      "elicitation_questions": [
+        "Can multiple attributes be combined to create a unique reference to an individual or their data?",
+        "Is there a distinctive identifier used during interactions or when referring to an individual\u2019s data?"
+      ],
+      "consequences": [
+        "Pseudonyms facilitate the aggregation of data on the same individual (see linking). Storing a substantial amount of data increases the possibility of identifying the individual behind it."
+      ],
+      "examples": [
+        "referring to an individual\u2019s data? \u0011 A dataset removes names and reduces addresses to cities.",
+        "Nevertheless, a combination of various attributes (city, birth date, language preference, etc.) could still be adequate to identify individuals."
+      ],
+      "additional_info": "Identifying individuals through identifiers is easy when these identifiers are reused across multiple services or in publicly available data."
     },
     {
       "id": "Nr1",
       "category": "Non-repudiation",
       "applies_to": "process",
-      "severity": "Low",
       "conditions": {
         "isALog": true,
         "stores_authenticated_identity": true
       },
-      "title": "Non-repudiation of service usage",
-      "description": "Users cannot deny having accessed a service because access logs tie session operations to explicit identities.",
-      "gdpr_articles": ["Art. 5(1)(c)"],
-      "mitigation": "Segregate audit identities, use blind tokens, or purge non-essential access logs periodically."
+      "title": "Non-Repudiation Of Service Usage",
+      "hotspot": "In/Outbound User",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "Users cannot deny having used a service because of authentication or logged access.",
+      "elicitation_questions": [
+        "Does the system record data affecting deniability?",
+        "Does the data itself impact deniability claims?"
+      ],
+      "consequences": [
+        "Identity information can magnify the impact.",
+        "Depending on the context (e.g., medical, whistleblower), this can have a large impact on the data subject."
+      ],
+      "examples": [
+        "\u0011 An account with a corporate email address eliminates the employee\u2019s deniability of having used that service.",
+        "\u0011 System administrators can access log files linking an entry in an internal complaint system to the individual employee."
+      ],
+      "additional_info": "If deniability is required, do not store the data at all or remove any attributable data. Avoid credentials with identity information."
     },
     {
       "id": "Nr2",
       "category": "Non-repudiation",
       "applies_to": "data_flow",
-      "severity": "Low",
       "conditions": {
         "direction": "inbound",
         "isSigned": true
       },
-      "title": "Non-repudiation of sending",
-      "description": "Transmitted payloads or messages are digitally signed, preventing data subjects from refuting authorship.",
-      "gdpr_articles": ["Art. 5(1)(c)"],
-      "mitigation": "Use ephemeral keys or deniable authentication schemes if persistent non-repudiation is not legally required."
+      "title": "Non-Repudiation Of Sending",
+      "hotspot": "Inbound User",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Users cannot deny having sent a message.",
+      "elicitation_questions": [
+        "Is the data digitally signed?",
+        "Which keys are used for signing? Who has access to these keys to verify signatures?"
+      ],
+      "consequences": [
+        "Signatures provide strong non- repudiation, as they can also be verified by third parties.",
+        "Append-only storage systems make it impossible for the data subject to later remove their personal data."
+      ],
+      "examples": [
+        "signatures? \u0011 A digitally signed email prevents the user from later denying having written the message.",
+        "\u0011 A common spam countermeasure (DKIM) involves signing outgoing emails, this prevents users from denying the authenticity of leaked or stolen emails."
+      ],
+      "additional_info": "Signed data applies not only to messages, but also to documents, requests, etc."
     },
     {
       "id": "Nr3",
       "category": "Non-repudiation",
       "applies_to": "data_flow",
-      "severity": "Low",
       "conditions": {
         "direction": "outbound",
         "generates_receipt_evidence": true
       },
-      "title": "Non-repudiation of receipt",
-      "description": "Outbound deliveries automatically trigger receipts, telemetry pings, or read markers confirming delivery.",
-      "gdpr_articles": ["Art. 5(1)(a)"],
-      "mitigation": "Make delivery confirmations opt-in and eliminate automated tracking pixels."
+      "title": "Non-Repudiation Of Receipt",
+      "hotspot": "Outbound User",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Users cannot deny having received a message.",
+      "elicitation_questions": [
+        "Do (passive) interactions with the system (e.g., receiving a message) have side-effects (e.g., trigger transmissions, logging)?",
+        "Is deniability of receipt a desired feature for the system?"
+      ],
+      "consequences": [
+        "Some actions may trigger side- effects that impact deniability claims regarding those actions."
+      ],
+      "examples": [
+        "\u0011 Read notifications serve as evidence that the user has opened/read the message.",
+        "\u0011 An individual\u2019s browser history may be used to substantiate claims about their online activities.",
+        "\u0011 Actions can be logged as evidence."
+      ],
+      "additional_info": "These side-effects often happen implicitly or without user intervention."
     },
     {
       "id": "Nr4",
       "category": "Non-repudiation",
       "applies_to": "data_store",
-      "severity": "Medium",
       "conditions": {
         "is_append_only": true,
         "prevents_erasure": true
       },
-      "title": "Non-repudiation of storage",
-      "description": "Data is stored on immutable or append-only structures, eliminating plausible deniability and right-to-erasure.",
-      "gdpr_articles": ["Art. 17"],
-      "mitigation": "Store cryptographic commitments or off-chain state instead of persisting raw records on immutable ledgers."
+      "title": "Non-Repudiation Of Storage",
+      "hotspot": "Storage",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Users cannot deny claims about data stored in non-repudiable storage.",
+      "elicitation_questions": [
+        "Is the data digitally signed?",
+        "Which keys are used for signing? Who has access to these keys to verify signatures?"
+      ],
+      "consequences": [
+        "Signatures provide strong non- repudiation, as they can also be verified by third parties.",
+        "Append-only storage systems make it impossible for the data subject to later remove their personal data."
+      ],
+      "examples": [
+        "signatures? \u0011 Data stored on a blockchain cannot be modified, eliminating the deniability of claims related to this data."
+      ],
+      "additional_info": "Signed data applies not only to messages, but also to documents, requests, etc."
     },
     {
       "id": "Nr5",
       "category": "Non-repudiation",
       "applies_to": "process",
-      "severity": "Low",
       "conditions": {
         "embeds_metadata": true
       },
-      "title": "Non-repudiation of hidden data or metadata",
-      "description": "Document generation or image exports retain embedded author metadata, revision logs, or invisible watermarks.",
-      "gdpr_articles": ["Art. 5(1)(c)"],
-      "mitigation": "Sanitize and strip EXIF, author tags, and build environment variables prior to document dispatch."
+      "title": "Non-Repudiation Of Hidden Data Or Metadata",
+      "hotspot": "Processing",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Hidden or metadata in a document prevent users from denying claims associated with it.",
+      "elicitation_questions": [
+        "Does stored or transmitted data have associated metadata?",
+        "Are there embedded data or hidden patterns in the data or transmissions?",
+        "Does this data lead to undesirable deniability issues?"
+      ],
+      "consequences": [
+        "The unintentional inclusion of metadata with data or transmissions may impact deniability claims.",
+        "Hidden/embedded data can prevent a user from denying claims about the data."
+      ],
+      "examples": [
+        "\u0011 Author or revision metadata in documents prevents deniability.",
+        "\u0011 Data watermarked with hidden artifacts (uniquely linked to a person) can be used to track the person revealing or disclosing the data afterwards.",
+        "\u0011 Remote resources (e.g.",
+        "image in email) are automatically loaded to track the user opening it."
+      ],
+      "additional_info": "This is also used as an explicit countermeasure to prevent people from sharing data."
     },
     {
       "id": "D1",
-      "category": "Detectability",
+      "category": "Detecting",
       "applies_to": "data_flow",
-      "severity": "Medium",
       "conditions": {
         "direction": "outbound",
         "reveals_resource_existence": true
       },
-      "title": "Detectable users",
-      "description": "System responses differentiate between 'wrong password' and 'user does not exist', leaking identity status.",
-      "gdpr_articles": ["Art. 32"],
-      "mitigation": "Return uniform generic error responses and equalize execution time for authentication failures."
+      "title": "Detectable Users",
+      "hotspot": "Outbound Flows",
+      "threat_sources": [
+        "External"
+      ],
+      "description": "Inferring the existence of a user from the system\u2019s response.",
+      "elicitation_questions": [
+        "Does the system show status messages (informational, warnings, errors) when retrieving data?",
+        "Are the status messages distinct when an item (a file, user, . . . ) does not exist compared to not having access rights?"
+      ],
+      "consequences": [
+        "Being able to detect the existence of certain items can be a stepping stone to security threats.",
+        "Simply knowing the existence of data may be su\ufb03cient to infer sensitive information."
+      ],
+      "examples": [
+        "exist compared to not having access rights? \u0011 A \u2018wrong password\u2019 error message reveals the existence of the account.",
+        "\u0011 A firewall responding with \u2018port closed\u2019 reveals the existence of a device at the IP address."
+      ],
+      "additional_info": "Prevent information leakage by not revealing the existence of items in system responses."
     },
     {
       "id": "D2",
-      "category": "Detectability",
+      "category": "Detecting",
       "applies_to": "data_flow",
-      "severity": "Medium",
       "conditions": {
         "publicNetwork": true,
         "isEncrypted": false
       },
-      "title": "Detectable service usage",
-      "description": "Unencrypted or observable transmission endpoints allow network observers to detect interaction with the service.",
-      "gdpr_articles": ["Art. 32"],
-      "mitigation": "Enforce strict TLS encryption, DNS-over-HTTPS, and mask server endpoint semantics."
+      "title": "Detectable Service Usage",
+      "hotspot": "In/Outbound User",
+      "threat_sources": [
+        "External"
+      ],
+      "description": "Detecting communication between a service and its users.",
+      "elicitation_questions": [
+        "Can the communication be observed?",
+        "Can information be inferred from the observed communications?"
+      ],
+      "consequences": [
+        "In sensitive contexts (medical, whistleblower) detecting service usage may have a severe impact on the user."
+      ],
+      "examples": [
+        "\u0011 Observing communication with a service to infer that a person is a user (e.g., adult website).",
+        "\u0011 Communication with a telemedicine service implies the user is a patient.",
+        "\u0011 Participation in the Tor network can be determined by observing tra\ufb03c."
+      ],
+      "additional_info": "Services like Tor conceal the destination but the utilization of Tor can still be detected."
     },
     {
       "id": "D3",
-      "category": "Detectability",
+      "category": "Detecting",
       "applies_to": "process",
-      "severity": "Low",
       "conditions": {
         "observable_side_effects": true
       },
-      "title": "Detectable events",
-      "description": "Application events produce observable side effects (e.g. disk size shifts, bursts of traffic, temporary lock files).",
-      "gdpr_articles": ["Art. 25"],
-      "mitigation": "Pad network packet lengths, normalize file processing sizes, and suppress public status indicators."
+      "title": "Detectable Events",
+      "hotspot": "In/Outbound Flows",
+      "threat_sources": [
+        "External"
+      ],
+      "description": "Detecting side effects or communications triggered by application events.",
+      "elicitation_questions": [
+        "Do actions in the system have side effects (e.g., saving a file, writing to a log, triggering other transmissions)?",
+        "Are these side effects observable?"
+      ],
+      "consequences": [
+        "Sensitive information may be deduced from observed side effects, such as communication."
+      ],
+      "examples": [
+        "\u0011 Log files on a shared system reveal applications used or actions taken by other users.",
+        "\u0011 Deleted applications may leave behind traces (configuration, temporary files).",
+        "\u0011 When steganography is used to hide data, the increased file size may still indicate the existence of that hidden data."
+      ],
+      "additional_info": "Dummy tra\ufb03c can be used to conceal actual events."
     },
     {
       "id": "D4",
-      "category": "Detectability",
+      "category": "Detecting",
       "applies_to": "process",
-      "severity": "Medium",
       "conditions": {
         "reveals_record_existence": true
       },
-      "title": "Detectable records",
-      "description": "Data retrieval queries or error codes leak whether an individual record or identifier exists in storage.",
-      "gdpr_articles": ["Art. 32"],
-      "mitigation": "Return standard HTTP 404 or generic access denial regardless of whether the record exists."
+      "title": "Detectable Records",
+      "hotspot": "Retrieving",
+      "threat_sources": [
+        "External"
+      ],
+      "description": "Detecting the existence of records in a system.",
+      "elicitation_questions": [
+        "Does the system show status messages (informational, warnings, errors) when retrieving data?",
+        "Are the status messages distinct when an item (a file, user, . . . ) does not exist compared to not having access rights?"
+      ],
+      "consequences": [
+        "Being able to detect the existence of certain items can be a stepping stone to security threats.",
+        "Simply knowing the existence of data may be su\ufb03cient to infer sensitive information."
+      ],
+      "examples": [
+        "exist compared to not having access rights? \u0011 An error message stating \u2018insu\ufb03cient access rights\u2019 may inadvertently leak the existence of a specific record.",
+        "\u0011 An error message stating \u2018address already registered\u2019 when subscribing to a political newsletter reveals a current member."
+      ],
+      "additional_info": "Prevent information leakage by not revealing the existence of items in system responses."
     },
     {
       "id": "DD1",
-      "category": "Disclosure of information",
+      "category": "Data disclosure",
       "applies_to": "data_flow",
-      "severity": "High",
       "conditions": {
         "direction": "inbound",
         "collects_excessive_sensitivity": true
       },
-      "title": "Excessively sensitive data collected",
-      "description": "The application ingests finer-grained or more sensitive personal data than necessary for core features.",
-      "gdpr_articles": ["Art. 5(1)(c)", "Art. 9"],
-      "mitigation": "Remove ingestion of non-essential attributes (e.g. precise GPS, biometric vectors) at the boundary."
+      "title": "Excessively Sensitive Data Collected",
+      "hotspot": "Inbound Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "The system acquires more sensitive or finegrained data than strictly necessary for its functionality.",
+      "elicitation_questions": [
+        "Is the data more sensitive than strictly necessary?",
+        "Is the data more fine-grained than strictly necessary?",
+        "Does the data encoding include additional (meta)data?"
+      ],
+      "consequences": [
+        "Processing excessively sensitive data amplifies the impact of a potential data breach, thereby increasing the consequences for the affected individuals."
+      ],
+      "examples": [
+        "\u0011 Tracking a patient\u2019s weight is pertinent for dieting apps but not for a contact tracing application.",
+        "\u0011 A smart meter shares realtime measurements rather than the aggregated consumption.",
+        "\u0011 A camera application on a smartphone does not necessarily need to record the picture\u2019s location."
+      ],
+      "additional_info": "When designing the system, assess whether all the data is genuinely necessary for providing the system\u2019s functionality."
     },
     {
       "id": "DD2",
-      "category": "Disclosure of information",
+      "category": "Data disclosure",
       "applies_to": "data_flow",
-      "severity": "Medium",
       "conditions": {
         "direction": "inbound",
         "high_collection_frequency": true
       },
-      "title": "Excessive amount of data collected",
-      "description": "System queries or collects records at higher frequencies or larger volume batches than strictly needed.",
-      "gdpr_articles": ["Art. 5(1)(c)"],
-      "mitigation": "Throttle ingestion, batch summary rollups, and pull updates on demand rather than continuous streaming."
+      "title": "Excessive Amount Of Data Collected",
+      "hotspot": "Inbound Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "The system acquires more data than strictly needed for its functionality.",
+      "elicitation_questions": [
+        "Is the amount of collected data necessary for the correct functioning of the system?",
+        "Is the processing frequency necessary?",
+        "Are there more data subjects involved than necessary?"
+      ],
+      "consequences": [
+        "Regular data collection results in an increased dataset, potentially giving rise to additional privacy threats, such as data mining for patterns."
+      ],
+      "examples": [
+        "\u0011 A generic service that is not age-restricted should not request a user\u2019s age.",
+        "\u0011 Recording patient weight on a weekly or monthly basis may su\ufb03ce; collecting such information every half hour is unnecessary.",
+        "\u0011 Posts on social networks frequently include personal data about other individuals."
+      ],
+      "additional_info": "Evaluate whether regular data collection is necessary for the system\u2019s functionality."
     },
     {
       "id": "DD3",
-      "category": "Disclosure of information",
+      "category": "Data disclosure",
       "applies_to": "process",
-      "severity": "Medium",
       "conditions": {
         "performs_unnecessary_enrichment": true
       },
-      "title": "Unnecessary data analysis",
-      "description": "Internal processes perform enrichment, automated classification, or analytics unrelated to primary service scope.",
-      "gdpr_articles": ["Art. 5(1)(b)"],
-      "mitigation": "Decouple analytics pipelines and require operational isolation for post-processing routines."
+      "title": "Unnecessary Data Analysis",
+      "hotspot": "Processing Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Data is further processed, analyzed, or enriched in a way that is not strictly necessary for the functionality.",
+      "elicitation_questions": [
+        "Is the data enrichment/analysis necessary for the system\u2019s functionality?"
+      ],
+      "consequences": [
+        "Processing the data can be used to learn additional sensitive information."
+      ],
+      "examples": [
+        "\u0011 A camera application on a smartphone does not need to perform face-based recognition or emotion detection.",
+        "\u0011 Analyzing a user\u2019s blog posts for language proficiency is unnecessary for blogging functionality.",
+        "\u0011 User profiles accumulate unnecessary details over time, tracking a broad range of actions or service usage that is not essential for the provided functionality."
+      ],
+      "additional_info": "Evaluate which types of personal data processing are necessary for providing the system\u2019s functionality."
     },
     {
       "id": "DD4",
-      "category": "Disclosure of information",
+      "category": "Data disclosure",
       "applies_to": "data_store",
-      "severity": "High",
       "conditions": {
         "has_retention_policy": false
       },
-      "title": "Unnecessary data retention",
-      "description": "Data is persisted indefinitely without time-to-live expiration or scheduled pruning procedures.",
-      "gdpr_articles": ["Art. 5(1)(e)"],
-      "mitigation": "Implement automated cron jobs or database retention TTLs to delete stale records."
+      "title": "Unnecessary Data Retention",
+      "hotspot": "Storage",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Data is stored for longer than needed.",
+      "elicitation_questions": [
+        "Is the data stored for longer time than necessary?"
+      ],
+      "consequences": [
+        "Storing data longer than needed serves no further purpose and increases the impact of a data breach."
+      ],
+      "examples": [
+        "\u0011 Retaining the email addresses of newsletter subscribers long after they have unsubscribed."
+      ],
+      "additional_info": "Evaluate your storage policies. Consider how long you store personal data and whether you have a process to remove data you no longer need."
     },
     {
       "id": "DD5",
-      "category": "Disclosure of information",
+      "category": "Data disclosure",
       "applies_to": "data_flow",
-      "severity": "High",
       "conditions": {
         "direction": "outbound",
         "exposes_to_third_parties": true
       },
-      "title": "Overexposure of personal data",
-      "description": "Personal records are shared broadly with external APIs, analytics partners, or client dashboards.",
-      "gdpr_articles": ["Art. 5(1)(c)", "Art. 28"],
-      "mitigation": "Apply strict output projections, whitelist exposed attributes, and audit third-party data flows."
+      "title": "Overexposure Of Personal Data",
+      "hotspot": "Outbound Personal Data",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "Personal data is shared with more services or external parties than necessary.",
+      "elicitation_questions": [
+        "Is the data necessary for the recipient?",
+        "Are there more parties involved than necessary?",
+        "How accessible is the data (public/limited/private)?"
+      ],
+      "consequences": [
+        "Overexposure of personal data may lead to unintended consequences, as others could reuse the data for unforeseen purposes."
+      ],
+      "examples": [
+        "\u0011 Location data from a navigation application is propagated to all the other applications (e.g., calendar, mail).",
+        "\u0011 Personal data is disclosed to other users of the service.",
+        "\u0011 In a medical application, while collecting patient weight data is deemed necessary, making such datasets publicly available would be unnecessary and harmful."
+      ],
+      "additional_info": "Carefully assess the necessity of sharing personal data and ensure that the involved parties genuinely require access to that data."
     },
     {
       "id": "U1",
-      "category": "Unawareness",
+      "category": "Unawareness and unintervenability",
       "applies_to": "data_flow",
-      "severity": "Medium",
       "conditions": {
         "direction": "inbound",
         "lacks_processing_notice": true
       },
-      "title": "Insufficient transparency",
-      "description": "Data subjects submit information without clear disclosure of processing scopes, sinks, or downstream sharing.",
-      "gdpr_articles": ["Art. 12", "Art. 13", "Art. 14"],
-      "mitigation": "Provide contextual, concise privacy notices at input collection forms."
+      "title": "Insufficient Transparency",
+      "hotspot": "Inbound User With Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Data subjects are insu\ufb03ciently informed about the collection and processing of their personal data.",
+      "elicitation_questions": [
+        "Are data subjects insu\ufb03ciently informed about the processing of personal data, including the purposes and methods of the processing involved?"
+      ],
+      "consequences": [
+        "Insu\ufb03cient transparency may lead to data subjects being unaware that their personal data is utilized for certain purposes, especially if those purposes are different from what was initially indicated."
+      ],
+      "examples": [
+        "personal data, including the purposes and methods of the processing involved? \u0011 Data subjects are not aware of the identities of the third parties with whom their data will be shared.",
+        "\u0011 The privacy notice provided to the data subject was not presented in clear and plain language.",
+        "\u0011 Data subjects are unaware that tra\ufb03c cameras collect not only number plates but also facial images."
+      ],
+      "additional_info": "Data subjects must also be informed on any \u2018indirect\u2019 data collection, i.e. from third parties."
     },
     {
       "id": "U2",
-      "category": "Unawareness",
+      "category": "Unawareness and unintervenability",
       "applies_to": "data_flow",
-      "severity": "Medium",
       "conditions": {
         "direction": "inbound",
         "shares_data_of_others": true
       },
-      "title": "Insufficient information when sharing data of others",
-      "description": "Users upload address books, media, or third-party details without verifying consent or notice mechanisms.",
-      "gdpr_articles": ["Art. 14"],
-      "mitigation": "Prompt uploaders for verification and provide opt-out channels for named third parties."
+      "title": "Insufficient Information When Sharing Data Of Others",
+      "hotspot": "Inbound Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "When sharing personal data of others, users are insu\ufb03ciently informed about the further data processing.",
+      "elicitation_questions": [
+        "If a user shares personal data of others, is it clear what, why, and how that data is further processed?"
+      ],
+      "consequences": [
+        "Users may not realize that they are unintentionally sharing personal data belonging to other individuals."
+      ],
+      "examples": [
+        "that data is further processed? \u0011 A user posting a picture on social media may not be aware that others in the picture are automatically tagged with a facial recognition system.",
+        "\u0011 Using a DNA testing service can entail sharing medical information about family members.",
+        "\u0011 A service invites a user to share their address book to find contacts on a service."
+      ],
+      "additional_info": "While users are often informed about the consequences of sharing their own data, systems rarely inform them about the impact of sharing data of others."
     },
     {
       "id": "U3",
-      "category": "Unawareness",
+      "category": "Unawareness and unintervenability",
       "applies_to": "process",
-      "severity": "Medium",
       "conditions": {
         "lacks_preference_controls": true
       },
-      "title": "Insufficient privacy controls",
-      "description": "The system does not offer user-facing controls to configure processing preferences, tracking toggles, or consent states.",
-      "gdpr_articles": ["Art. 7", "Art. 25"],
-      "mitigation": "Build preference management dashboards defaulting to highest-privacy configurations."
+      "title": "Insufficient Privacy Controls",
+      "hotspot": "Inbound User",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Data subjects have insu\ufb03cient controls to manage their preferences.",
+      "elicitation_questions": [
+        "Does the system enable the data subject to configure which personal data is processed and for what purposes?",
+        "Can the data subject alter their preferences afterwards?"
+      ],
+      "consequences": [
+        "Appropriate control mechanisms are required to record data subject preferences and keep track of how the data may be further processed."
+      ],
+      "examples": [
+        "\u0011 The data subject is unable to set appropriate preferences on which data is shared and why.",
+        "\u0011 The data subject is unable to set their consent preferences for the processing of personal data."
+      ],
+      "additional_info": "Privacy-friendly settings should be the default. Nudging can raise awareness and induce more privacy-preserving behavior."
     },
     {
       "id": "U4",
-      "category": "Unawareness",
+      "category": "Unawareness and unintervenability",
       "applies_to": "data_store",
-      "severity": "High",
       "conditions": {
         "provides_user_access": false
       },
-      "title": "Insufficient access",
-      "description": "Data subjects cannot retrieve, view, or export the personal records collected and stored about them.",
-      "gdpr_articles": ["Art. 15", "Art. 20"],
-      "mitigation": "Expose self-service data export APIs or standardized take-out archives."
+      "title": "Insufficient Access",
+      "hotspot": "Storing",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Data subjects do not have access to their personal data.",
+      "elicitation_questions": [
+        "Do data subjects lack the ability to access the personal data being collected, processed, stored, or disclosed about them?"
+      ],
+      "consequences": [
+        "Lack of access may violate the legal rights of data subjects."
+      ],
+      "examples": [
+        "collected, processed, stored, or disclosed about them? \u0011 It is not possible for a data subject to request access, neither directly through the system nor indirectly through a helpdesk.",
+        "\u0011 The sensor data from a wearable is transmitted to a lifestyle tracking app, but the user cannot access statistics and information derived from their data."
+      ],
+      "additional_info": "The right to access is not always absolute. Limitations may exist depending on applicable laws (e.g., trade secrets, rights of other data subjects)."
     },
     {
       "id": "U5",
-      "category": "Unawareness",
+      "category": "Unawareness and unintervenability",
       "applies_to": "data_store",
-      "severity": "High",
       "conditions": {
         "provides_rectification_erasure": false
       },
-      "title": "Insufficient rectification or erasure",
-      "description": "System lacks functionality allowing individuals to update inaccurate data or execute hard deletions.",
-      "gdpr_articles": ["Art. 16", "Art. 17"],
-      "mitigation": "Implement endpoints supporting atomic profile updates and hard record deletion cascading across stores."
+      "title": "Insufficient Rectification Or Erasure",
+      "hotspot": "Retrieving",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Data subjects cannot rectify or erase their personal data.",
+      "elicitation_questions": [
+        "Do data subjects have the ability to correct or delete their personal data?"
+      ],
+      "consequences": [
+        "Data subjects have the right to rectify incorrect personal data or request the removal of data that is no longer relevant or needed."
+      ],
+      "examples": [
+        "data? \u0011 The data subject is unable to correct their personal data.",
+        "\u0011 When a data subject deletes their social media account, the account is disabled, but the actual data is not erased.",
+        "\u0011 A data subject is unable to update their home address after relocating."
+      ],
+      "additional_info": "Rectification or erasure can also be performed indirectly (e.g., through a customer service ticket)."
     },
     {
       "id": "Nc1",
       "category": "Non-compliance",
       "applies_to": "process",
-      "severity": "Critical",
       "conditions": {
         "lacks_legal_basis": true
       },
-      "title": "Non-compliance of processing with applicable regulations",
-      "description": "Personal data operations lack a documented legal ground (e.g. consent, contract necessity, legitimate interest).",
-      "gdpr_articles": ["Art. 6", "Art. 9"],
-      "mitigation": "Enforce legal basis tagging on all ingestion pipelines and block processing without valid basis flags."
+      "title": "Non-Compliance Of Processing With Applicable Regulations",
+      "hotspot": "Processing Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "The processing of personal data by the system is not compliant with applicable privacy regulations.",
+      "elicitation_questions": [
+        "Will the system be used in jurisdictions with specific rules for personal data processing (e.g., the EU)?",
+        "Does the system, or its processing activities, violate one or more rules in these applicable regulation(s)?"
+      ],
+      "consequences": [
+        "Non-compliance with local regulations may lead to hefty fines or other sanctions.",
+        "High-profile complaint cases or lawsuits may lead to negative media exposure and reputational damage."
+      ],
+      "examples": [
+        "in these applicable regulation(s)? \u0011 The system processes information of EU citizens without a valid legal ground under GDPR.",
+        "\u0011 The system shares user information with third parties, violating \u2019Do Not Sell My Data\u2019 rights under the CCPA."
+      ],
+      "additional_info": "Before processing any personal data, perform an assessment on the applicable regulations for your processing activities and system."
     },
     {
       "id": "Nc2",
       "category": "Non-compliance",
       "applies_to": "process",
-      "severity": "Medium",
       "conditions": {
         "deviates_from_privacy_standards": true
       },
-      "title": "Non-adherence to privacy standards",
-      "description": "Architecture lacks documented adherence to established privacy engineering frameworks (ISO 27701, NIST Privacy).",
-      "gdpr_articles": ["Art. 25"],
-      "mitigation": "Align telemetry, storage, and processing controls with NIST Privacy Framework or ISO/IEC 27701."
+      "title": "Non-Adherence To Privacy Standards",
+      "hotspot": "Processing Personal Data",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "The system is not compliant with privacy standards and best practices.",
+      "elicitation_questions": [
+        "Are there any (industry) specific privacy standards that are applicable to the system?",
+        "Does the system adequately implement the principles and controls outlined in these standards?"
+      ],
+      "consequences": [
+        "Non-adherence to industry standards and best practices makes it more di\ufb03cult to demonstrate compliance with applicable laws."
+      ],
+      "examples": [
+        "outlined in these standards? \u0011 The system does not adhere to the best practices and principles outlined in the relevant ISO norms on data protection and privacy- by-design.",
+        "\u0011 Privacy risks are not classified and managed using a standardized methodology such as the NIST Privacy Framework."
+      ],
+      "additional_info": "Check whether there is industry-specific guidance on data processing for your sector (e.g., healthcare, manufacturing)."
     },
     {
       "id": "Nc3",
       "category": "Non-compliance",
       "applies_to": "process",
-      "severity": "Medium",
       "conditions": {
         "lacks_lifecycle_management": true
       },
-      "title": "Improper data lifecycle management",
-      "description": "Absence of structured lifecycle state transitions (collection, validation, archiving, permanent destruction).",
-      "gdpr_articles": ["Art. 5(1)(e)", "Art. 25"],
-      "mitigation": "Formulate programmatic data lifecycle state machines enforcing archival and deletion triggers."
+      "title": "Improper Data Lifecycle Management",
+      "hotspot": "Processing",
+      "threat_sources": [
+        "Organizational"
+      ],
+      "description": "Data is not properly managed throughout its entire lifecycle within the system.",
+      "elicitation_questions": [
+        "Is there a data lifecycle management policy defined for the data processed within the system?",
+        "Does the policy outline clear principles for each phase of the data lifecycle (creation, storage, sharing and usage, archival, and destruction)?"
+      ],
+      "consequences": [
+        "Inadequate or nonexistent data lifecycle management can result in a loss of overview of the data within the system and its maintenance, posing concerns not only for privacy and data protection but also security and availability."
+      ],
+      "examples": [
+        "data lifecycle (creation, storage, sharing and usage, archival, and destruction)? \u0011 There is no clear policy or mechanism to enforce deletion of data that is no longer needed.",
+        "\u0011 The organizational roles and responsibilities surrounding data management in the system are not su\ufb03ciently defined."
+      ],
+      "additional_info": "Data lifecycle management is a continuous process that must be consistently carried out as long as the system is designed, developed, and used."
     },
     {
       "id": "Nc4",
       "category": "Non-compliance",
       "applies_to": "process",
-      "severity": "Critical",
       "conditions": {
         "isEncrypted": false,
         "storesCredentials": true
       },
-      "title": "Insufficient security of processing",
-      "description": "Security measures fail to protect personal records against unauthorized processing, theft, or compromise.",
-      "gdpr_articles": ["Art. 5(1)(f)", "Art. 32"],
-      "mitigation": "Implement end-to-end encryption, strict role-based access control, and regular vulnerability scanning."
+      "title": "Insufficient Security Of Processing",
+      "hotspot": "Processing",
+      "threat_sources": [
+        "Organizational",
+        "External"
+      ],
+      "description": "Data security measures and processes do not adhere to risk and security management best practices and standards.",
+      "elicitation_questions": [
+        "Is there an established process to manage security risks and identify the required countermeasures?",
+        "Does the system incorporate the required countermeasures?",
+        "Are the countermeasures aligned with industry standards and best practices?"
+      ],
+      "consequences": [
+        "The security of the system plays a crucial role in safeguarding the privacy of individuals whose data is processed. Personal data breaches can result in significant fines and reputational damage."
+      ],
+      "examples": [
+        "practices? \u0011 No security assessment was performed of the software.",
+        "\u0011 There are no processes in place to ensure software and services are kept up to date.",
+        "\u0011 The organization does not use appropriate access control mechanisms to limit access of employees to personal data."
+      ],
+      "additional_info": "Consider complementary methods like security threat modeling. Consider adhering to standards such as ISO27001 or the CIS Security Controls."
     }
   ]
 }
