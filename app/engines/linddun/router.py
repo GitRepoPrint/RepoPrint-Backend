@@ -6,10 +6,10 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.routers.dfd import _admit, _analyse_repository, _failure
 from app.schemas.dfd import DfdGraph
-from app.schemas.linddun import LinddunReport
+from app.engines.linddun.schemas import LinddunReport
 from app.services.github import GitHubError
-from app.services.linddun_catalog import load_catalog
-from app.services.linddun_engine import LinddunEngine
+from app.engines.linddun.catalog import load_catalog
+from app.engines.linddun.engine import LinddunEngine
 
 router = APIRouter(prefix="/linddun", tags=["linddun"])
 

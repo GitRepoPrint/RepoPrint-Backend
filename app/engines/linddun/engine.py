@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from app.schemas.dfd import DfdGraph
-from app.schemas.linddun import LinddunFinding, LinddunReport, LinddunSummary
-from app.services.dfd_to_linddun import map_dfd_to_linddun
-from app.services.linddun_catalog import load_catalog
+from app.engines.linddun.schemas import LinddunFinding, LinddunReport, LinddunSummary
+from app.engines.linddun.mapper import map_dfd_to_linddun
+from app.engines.linddun.catalog import load_catalog
 
 
 class LinddunEngine:

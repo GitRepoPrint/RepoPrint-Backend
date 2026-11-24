@@ -1,0 +1,118 @@
+{
+  "repository": "sistema-clinico-hospitalar",
+  "analyzed_at": "2026-11-18T14:57:10.957414Z",
+  "summary": {
+    "total_findings": 5,
+    "by_category": {
+      "Linkability": 0,
+      "Identifiability": 2,
+      "Non-repudiation": 0,
+      "Detectability": 1,
+      "Disclosure of information": 1,
+      "Unawareness": 1,
+      "Non-compliance": 0
+    },
+    "by_severity": {
+      "Critical": 0,
+      "High": 4,
+      "Medium": 1,
+      "Low": 0,
+      "Info": 0
+    }
+  },
+  "findings": [
+    {
+      "threat_id": "I5",
+      "category": "Identifiability",
+      "severity": "High",
+      "target_type": "data_store",
+      "component_id": "3",
+      "component_name": "PostgreSQL (Histórico Clínico)",
+      "title": "Identifiable dataset",
+      "description": "Stored records contain combined demographic, operational, or location attributes that allow re-identification.",
+      "gdpr_articles": [
+        "Art. 4(1)",
+        "Art. 32"
+      ],
+      "mitigation": "Apply l-diversity, t-closeness, or noise injection to stored analytical tables.",
+      "source": null,
+      "target": null,
+      "file_path": null,
+      "extra": {}
+    },
+    {
+      "threat_id": "DD4",
+      "category": "Disclosure of information",
+      "severity": "High",
+      "target_type": "data_store",
+      "component_id": "3",
+      "component_name": "PostgreSQL (Histórico Clínico)",
+      "title": "Unnecessary data retention",
+      "description": "Data is persisted indefinitely without time-to-live expiration or scheduled pruning procedures.",
+      "gdpr_articles": [
+        "Art. 5(1)(e)"
+      ],
+      "mitigation": "Implement automated cron jobs or database retention TTLs to delete stale records.",
+      "source": null,
+      "target": null,
+      "file_path": null,
+      "extra": {}
+    },
+    {
+      "threat_id": "U4",
+      "category": "Unawareness",
+      "severity": "High",
+      "target_type": "data_store",
+      "component_id": "3",
+      "component_name": "PostgreSQL (Histórico Clínico)",
+      "title": "Insufficient access",
+      "description": "Data subjects cannot retrieve, view, or export the personal records collected and stored about them.",
+      "gdpr_articles": [
+        "Art. 15",
+        "Art. 20"
+      ],
+      "mitigation": "Expose self-service data export APIs or standardized take-out archives.",
+      "source": null,
+      "target": null,
+      "file_path": null,
+      "extra": {}
+    },
+    {
+      "threat_id": "D2",
+      "category": "Detectability",
+      "severity": "Medium",
+      "target_type": "data_flow",
+      "component_id": "DF1",
+      "component_name": "Envio de Login e Dados de Saúde",
+      "title": "Detectable service usage",
+      "description": "Unencrypted or observable transmission endpoints allow network observers to detect interaction with the service.",
+      "gdpr_articles": [
+        "Art. 32"
+      ],
+      "mitigation": "Enforce strict TLS encryption, DNS-over-HTTPS, and mask server endpoint semantics.",
+      "source": "1",
+      "target": "2",
+      "file_path": null,
+      "extra": {}
+    },
+    {
+      "threat_id": "I1",
+      "category": "Identifiability",
+      "severity": "High",
+      "target_type": "data_flow",
+      "component_id": "DF2",
+      "component_name": "Acesso a Registos Médicos",
+      "title": "Identified user requests",
+      "description": "Incoming user requests contain explicit identity data (e.g. full name, email, credentials).",
+      "gdpr_articles": [
+        "Art. 5(1)(c)",
+        "Art. 25"
+      ],
+      "mitigation": "Avoid requesting direct identity data when pseudonymous authentication or zero-knowledge proofs suffice.",
+      "source": "2",
+      "target": "3",
+      "file_path": null,
+      "extra": {}
+    }
+  ]
+}

@@ -12,9 +12,13 @@ from app.schemas.dfd import (
     Provenance,
     RepositoryRef,
 )
-from app.services.dfd_to_linddun import map_dfd_to_linddun
-from app.services.linddun_catalog import get_categories, get_rules, load_catalog
-from app.services.linddun_engine import LinddunEngine
+from app.engines.linddun import (
+    LinddunEngine,
+    get_categories,
+    get_rules,
+    load_catalog,
+    map_dfd_to_linddun,
+)
 import main
 
 
