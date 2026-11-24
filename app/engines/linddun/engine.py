@@ -1,14 +1,15 @@
-"""Motor de análise de privacidade LINDDUN.
+"""Motor de análise de privacidade LINDDUN GO.
 
-Avalia regras LINDDUN sobre os nós (process, data_store) e fluxos (data_flow) de um DFD
-e produz um relatório estruturado de ameaças de privacidade (findings).
+Avalia as 33 cartas do LINDDUN GO sobre os nós e fluxos de um DFD e produz um
+relatório estruturado de ameaças de privacidade puras (threats), com as respetivas
+perguntas de elicitação, hotspots, consequências e informação de contexto.
 """
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 
 from app.schemas.dfd import DfdGraph
-from app.engines.linddun.schemas import LinddunFinding, LinddunReport, LinddunSummary
+from app.engines.linddun.schemas import LinddunReport, LinddunSummary, LinddunThreat
 from app.engines.linddun.mapper import map_dfd_to_linddun
 from app.engines.linddun.catalog import load_catalog
 
@@ -29,12 +30,11 @@ class LinddunEngine:
 
     def analyze(self, dfd: Union[DfdGraph, Dict[str, Any]]) -> LinddunReport:
         """
-        Executa a análise de ameaças LINDDUN sobre um grafo DFD (DfdGraph ou dict canónico).
+        Executa a análise de ameaças LINDDUN GO sobre um grafo DFD.
         """
-        # Mapear e normalizar propriedades se necessário
         normalized_dfd = map_dfd_to_linddun(dfd)
 
-        findings: List[LinddunFinding] = []
+        threats: List[LinddunThreat] = []
         elements = normalized_dfd.get("elements", [])
         data_flows = normalized_dfd.get("data_flows", [])
 
@@ -45,13 +45,12 @@ class LinddunEngine:
 
             for rule in self.rules:
                 target_rule_type = rule.get("applies_to")
-                # Permitir correspondência flexível para actors / external_entity
                 if target_rule_type != elem_type:
                     if not (target_rule_type in {"actor", "external_entity"} and elem_type in {"actor", "external_entity"}):
                         continue
 
                 if self._matches_conditions(rule.get("conditions", {}), elem_props):
-                    findings.append(self._create_finding(rule, elem, is_flow=False))
+                    threats.append(self._create_threat(rule, elem, is_flow=False))
 
         # 2. Avaliar regras para fluxos de dados (data_flow)
         for flow in data_flows:
@@ -62,22 +61,27 @@ class LinddunEngine:
                     continue
 
                 if self._matches_conditions(rule.get("conditions", {}), flow_props):
-                    findings.append(self._create_finding(rule, flow, is_flow=True))
+                    threats.append(self._create_threat(rule, flow, is_flow=True))
 
-        # 3. Estatísticas sumárias
-        # Inicializar todas as categorias LINDDUN e severidades para consumo direto na UI (ex: gráficos radar/barras)
+        # 3. Sumário quantitativo puro do LINDDUN GO
         by_category = {cat: 0 for cat in self.categories.values()}
-        for f in findings:
-            by_category[f.category] = by_category.get(f.category, 0) + 1
+        for t in threats:
+            by_category[t.category] = by_category.get(t.category, 0) + 1
 
-        by_severity = {sev: 0 for sev in ["Critical", "High", "Medium", "Low", "Info"]}
-        for f in findings:
-            by_severity[f.severity] = by_severity.get(f.severity, 0) + 1
+        by_threat_source = {"Organizational": 0, "External": 0}
+        for t in threats:
+            for s in t.threat_sources:
+                by_threat_source[s] = by_threat_source.get(s, 0) + 1
+
+        by_target_type = {"process": 0, "data_store": 0, "data_flow": 0, "actor": 0}
+        for t in threats:
+            by_target_type[t.target_type] = by_target_type.get(t.target_type, 0) + 1
 
         summary = LinddunSummary(
-            total_findings=len(findings),
+            total_threats=len(threats),
             by_category=by_category,
-            by_severity=by_severity,
+            by_threat_source=by_threat_source,
+            by_target_type=by_target_type,
         )
 
         repo_name = normalized_dfd.get("repository", "unknown")
@@ -86,7 +90,8 @@ class LinddunEngine:
             repository=repo_name,
             analyzed_at=datetime.now(timezone.utc),
             summary=summary,
-            findings=findings,
+            threats=threats,
+            findings=threats,
         )
 
     def _matches_conditions(self, conditions: Dict[str, Any], properties: Dict[str, Any]) -> bool:
@@ -106,18 +111,21 @@ class LinddunEngine:
 
         return True
 
-    def _create_finding(self, rule: Dict[str, Any], component: Dict[str, Any], is_flow: bool) -> LinddunFinding:
-        return LinddunFinding(
+    def _create_threat(self, rule: Dict[str, Any], component: Dict[str, Any], is_flow: bool) -> LinddunThreat:
+        return LinddunThreat(
             threat_id=rule["id"],
             category=rule["category"],
-            severity=rule["severity"],
+            title=rule["title"],
+            hotspot=rule.get("hotspot", ""),
+            threat_sources=rule.get("threat_sources", []),
             target_type=rule["applies_to"],
             component_id=str(component.get("id", "")),
             component_name=component.get("name"),
-            title=rule["title"],
             description=rule["description"],
-            gdpr_articles=rule.get("gdpr_articles", []),
-            mitigation=rule.get("mitigation", ""),
+            elicitation_questions=rule.get("elicitation_questions", []),
+            consequences=rule.get("consequences", []),
+            examples=rule.get("examples", []),
+            additional_info=rule.get("additional_info", ""),
             source=str(component.get("source")) if is_flow and component.get("source") is not None else None,
             target=str(component.get("target")) if is_flow and component.get("target") is not None else None,
             file_path=component.get("file_path"),

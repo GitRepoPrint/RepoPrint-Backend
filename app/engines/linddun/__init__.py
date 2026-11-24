@@ -1,4 +1,4 @@
-"""Motor e endpoints de análise de privacidade LINDDUN."""
+"""Motor e endpoints de análise de privacidade LINDDUN GO puro."""
 from app.engines.linddun.catalog import (
     get_categories,
     get_data_types,
@@ -13,8 +13,8 @@ from app.engines.linddun.schemas import (
     LinddunCategory,
     LinddunFinding,
     LinddunReport,
-    LinddunSeverity,
     LinddunSummary,
+    LinddunThreat,
     TargetType,
 )
 
@@ -28,9 +28,9 @@ __all__ = [
     "get_data_types",
     "router",
     "LinddunReport",
+    "LinddunThreat",
     "LinddunFinding",
     "LinddunSummary",
     "LinddunCategory",
-    "LinddunSeverity",
     "TargetType",
 ]
