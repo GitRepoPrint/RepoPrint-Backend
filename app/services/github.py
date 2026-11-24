@@ -26,6 +26,7 @@ query($owner: String!, $name: String!, $prs: Int!, $reviews: Int!) {
 CODEOWNERS_PATHS= (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS")
 WEEK_SECONDS= 7 * 24 * 3600
 CI_PASSING= {"success": True, "failure": False, "timed_out": False, "startup_failure": False}
+API = settings.github_api_url
 
 REPO_RE= re.compile(r"^https?://(?:www\.)?github\.com/([^/\s]+)/([^/\s#?]+?)(?:\.git)?(?:/.*)?$")
 

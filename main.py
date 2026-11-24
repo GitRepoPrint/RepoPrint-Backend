@@ -2,12 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.services.guard import DfdGuard
-from app.routers import dfd, github, health, me, repositories
 from app.engines.linddun import router as linddun_router
+from app.routers import dfd, github, health, me, repositories, stride
+from app.services.guard import DfdGuard
+
 
 def create_app() -> FastAPI:
-    app= FastAPI(title="RepoPrint Backend")
+    app = FastAPI(title="RepoPrint Backend")
     # O frontend (outra origem) chama esta API diretamente do navegador; sem isto o navegador bloqueia as respostas.
     # Só leitura (GET), sem cookies nem credenciais.
     app.add_middleware(
@@ -17,13 +18,14 @@ def create_app() -> FastAPI:
         allow_headers=["Accept"],
         max_age=600,
     )
-    app.state.guard= DfdGuard.from_settings(settings)
+    app.state.guard = DfdGuard.from_settings(settings)
     app.include_router(github.router)
     app.include_router(health.router)
     app.include_router(me.router)
     app.include_router(repositories.router)
     app.include_router(dfd.router)
     app.include_router(linddun_router)
+    app.include_router(stride.router)
 
     @app.get("/health")
     async def root():
@@ -32,4 +34,4 @@ def create_app() -> FastAPI:
     return app
 
 
-app= create_app()
+app = create_app()
