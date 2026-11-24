@@ -109,9 +109,9 @@ def test_catalog_loading_and_categories():
     categories = get_categories()
     rules = get_rules()
     assert len(categories) == 7
-    assert "Linkability" in categories.values()
-    assert "Identifiability" in categories.values()
-    assert len(rules) >= 30
+    assert "Linking" in categories.values()
+    assert "Identifying" in categories.values()
+    assert len(rules) == 33
 
 
 def test_cw685_canonical_evaluation(cw685_dfd):
@@ -119,13 +119,17 @@ def test_cw685_canonical_evaluation(cw685_dfd):
     report = engine.analyze(cw685_dfd)
 
     assert report.repository == "kuleuven-cw685-social-network"
-    assert report.summary.total_findings > 0
-    assert "Linkability" in report.summary.by_category
-    assert "Identifiability" in report.summary.by_category
+    assert report.summary.total_threats > 0
+    assert "Linking" in report.summary.by_category
+    assert "Identifying" in report.summary.by_category
 
     threats_by_component = {}
-    for finding in report.findings:
-        threats_by_component.setdefault(finding.component_name, []).append(finding.threat_id)
+    for threat in report.threats:
+        threats_by_component.setdefault(threat.component_name, []).append(threat.threat_id)
+        # Validar campos puristas LINDDUN GO
+        assert threat.hotspot != ""
+        assert len(threat.elicitation_questions) > 0
+        assert len(threat.consequences) > 0
 
     # 1. Validação no Data Store (CW685 Página 26: L4, I5, DD4)
     ds_threats = threats_by_component.get("Social network data", [])
