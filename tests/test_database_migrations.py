@@ -21,6 +21,7 @@ EXPECTED_TABLES= {
     "chat_messages",
     "dfd_graphs",
     "false_positive_feedbacks",
+    "github_installations",
     "repositories",
     "team_members",
     "teams",

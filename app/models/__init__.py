@@ -3,7 +3,7 @@ from app.models.audit import AuditLog
 from app.models.chat import ChatConversation, ChatMessage
 from app.models.feedback import FalsePositiveFeedback
 from app.models.repository import Repository
-from app.models.user import Team, TeamMember, User, UserOAuth
+from app.models.user import GitHubInstallation, Team, TeamMember, User, UserOAuth
 
 __all__= [
     "ActivityMetrics",
@@ -13,6 +13,7 @@ __all__= [
     "ChatMessage",
     "DfdGraph",
     "FalsePositiveFeedback",
+    "GitHubInstallation",
     "Repository",
     "Team",
     "TeamMember",
